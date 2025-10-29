@@ -61,4 +61,49 @@ class SheetsService {
         $body = new ValueRange(['values' => [ $fila ]]);
         $this->sheets->spreadsheets_values->append($indiceSpreadsheetId, 'IndicePacientes!A1:C1', $body, ['valueInputOption' => 'RAW']);
     }
+
+    public function createSpreadsheet(string $title): string {
+        $req = new \Google\Service\Sheets\Spreadsheet([
+            'properties' => ['title' => $title]
+        ]);
+        $sheet = $this->sheets->spreadsheets->create($req, ['fields' => 'spreadsheetId']);
+        return $sheet->spreadsheetId;
+    }
+
+    public function ensureEncuentrosSheet(string $spreadsheetId): void {
+        // Crea hoja Encuentros con cabeceras
+        $requests = [
+            new \Google\Service\Sheets\Request(['addSheet' => ['properties' => ['title' => 'Encuentros']]]),
+        ];
+        $this->sheets->spreadsheets->batchUpdate(
+            $spreadsheetId,
+            new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+        );
+
+        $headers = new \Google\Service\Sheets\ValueRange([
+            'values' => [[
+                'FECHA','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN','EDAD_EN_ESE_ENCUENTRO'
+            ]]
+        ]);
+        $this->sheets->spreadsheets_values->update($spreadsheetId, 'Encuentros!A1:E1', $headers, ['valueInputOption' => 'RAW']);
+    }
+
+    public function seedPerfil(string $spreadsheetId): void {
+        $keys = [
+            'NOMBRE_Y_APELLIDO','FOTO_URL','CONTACTO','FECHA_NAC','HORA_NAC',
+            'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
+            'CIUDAD_ULT_CUMPLE','PROV_ULT_CUMPLE','PAIS_ULT_CUMPLE','OBSERVACIONES',
+            'FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD',
+            'SIGNO_SOLAR','FECHA_ENCUENTRO_INICIAL','HORA_ENCUENTRO_INICIAL','EDAD_EN_ENCUENTRO_INICIAL',
+            'SIGNO_SUBYACENTE','BALANCE_ENERGETICO','DISPOSITORES','PROGRESIONES_RETORNOS',
+            'FASE_LUNACION_NATAL','PLANETA_ASOCIADO_LUNACION',
+            'PRIMERA_VEZ_ASTROLOGIA','PROFESION','VIVO_CON','HOGAR_INFANCIA','ENF_INFANCIA',
+            'SINTOMAS_ACTUALES','MOTIVO_CONSULTA','DETALLE_ENCUENTRO_INICIAL',
+            'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO','ULTIMA_ACTUALIZACION'
+        ];
+        $rows = array_map(fn($k) => [$k, ''], $keys);
+        $body = new \Google\Service\Sheets\ValueRange(['values' => $rows]);
+        $this->sheets->spreadsheets_values->update($spreadsheetId, 'Perfil!A1:B'.count($rows), $body, ['valueInputOption' => 'RAW']);
+    }
+
 }

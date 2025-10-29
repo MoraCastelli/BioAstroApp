@@ -22,6 +22,16 @@ class DriveService {
         return $copied->id;
     }
 
+    public function moveToFolder(string $fileId, string $folderId): void {
+        // Primero obtener padres actuales
+        $file = $this->drive->files->get($fileId, ['fields' => 'parents']);
+        $previousParents = join(',', $file->getParents() ?? []);
+        $params = ['addParents' => $folderId, 'fields' => 'id, parents'];
+        if ($previousParents) $params['removeParents'] = $previousParents;
+        $this->drive->files->update($fileId, new \Google\Service\Drive\DriveFile(), $params);
+    }
+
+
     public function findByNameInFolder(string $folderId, string $name): ?string {
         $q = sprintf("name = '%s' and '%s' in parents and trashed = false", addslashes($name), $folderId);
         $res = $this->drive->files->listFiles(['q' => $q, 'fields' => 'files(id,name)', 'pageSize' => 1]);
@@ -56,6 +66,19 @@ class DriveService {
             'role' => 'reader',
         ]));
     }
+
+    public function createSpreadsheetInFolder(string $name, string $folderId): string
+    {
+        $fileMeta = new \Google\Service\Drive\DriveFile([
+            'name' => $name,
+            'mimeType' => 'application/vnd.google-apps.spreadsheet',
+            'parents' => [$folderId],
+        ]);
+
+        $file = $this->drive->files->create($fileMeta, ['fields' => 'id']);
+        return $file->id; // spreadsheetId
+    }
+
 
     public function getShareLink(string $fileId): string {
         return "https://drive.google.com/file/d/{$fileId}/view";

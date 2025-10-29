@@ -24,18 +24,29 @@ class PacienteRepository
 
     public function crearDesdeTemplate(string $nombreApellido): string
     {
-        $spreadsheetId = $this->drive->copyToDbFolder(
-            config('services.google.template_id'),
-            $this->fileName($nombreApellido)
+        $drive  = \App\Services\DriveService::make();
+        $sheets = $this->sheets;
+
+        // 1) Crear spreadsheet directamente en la carpeta "Base de Datos" con Drive
+        $spreadsheetId = $drive->createSpreadsheetInFolder(
+            $this->fileName($nombreApellido),
+            config('services.google.db_folder_id')
         );
 
-        $this->sheets->setPerfil($spreadsheetId, [
-            'NOMBRE_Y_APELLIDO'     => $nombreApellido,
-            'ULTIMA_ACTUALIZACION'  => Carbon::now()->toIso8601String(),
+        // 2) Sembrar estructura con Sheets
+        $sheets->seedPerfil($spreadsheetId);
+        $sheets->ensureEncuentrosSheet($spreadsheetId);
+
+        // 3) Valores iniciales
+        $this->guardarPerfil($spreadsheetId, [
+            'NOMBRE_Y_APELLIDO'    => $nombreApellido,
+            'ULTIMA_ACTUALIZACION' => \Carbon\Carbon::now()->toIso8601String(),
         ]);
 
         return $spreadsheetId;
     }
+
+
 
     public function guardarPerfil(string $spreadsheetId, array $perfil): void
     {
