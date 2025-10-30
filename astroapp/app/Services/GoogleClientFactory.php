@@ -9,11 +9,29 @@ class GoogleClientFactory {
         $client = new Client();
         $client->setApplicationName(config('app.name'));
         $client->setScopes([
-            \Google\Service\Drive::DRIVE,
+            \Google\Service\Drive::DRIVE_FILE,
             \Google\Service\Sheets::SPREADSHEETS,
         ]);
-        $client->setAuthConfig(config('services.google.credentials'));
         $client->setAccessType('offline');
+        $client->setPrompt('consent');
+        $client->setClientId(env('GOOGLE_OAUTH_CLIENT_ID'));
+        $client->setClientSecret(env('GOOGLE_OAUTH_CLIENT_SECRET'));
+        $client->setRedirectUri(env('GOOGLE_OAUTH_REDIRECT_URI'));
+
+        // Cargar token del usuario
+        $tokenPath = storage_path('app/google/token.json');
+        if (!file_exists($tokenPath)) {
+            throw new \RuntimeException('GOOGLE_OAUTH_NOT_AUTHENTICATED');
+        }
+        $token = json_decode(file_get_contents($tokenPath), true);
+        $client->setAccessToken($token);
+
+        if ($client->isAccessTokenExpired()) {
+            if ($client->getRefreshToken()) {
+                $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+                file_put_contents($tokenPath, json_encode($client->getAccessToken()));
+            }
+        }
         return $client;
     }
 }
