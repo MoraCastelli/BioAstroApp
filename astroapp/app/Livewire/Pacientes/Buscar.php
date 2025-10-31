@@ -3,7 +3,7 @@
 namespace App\Livewire\Pacientes;
 
 use Livewire\Component;
-use Google\Service\Sheets;
+use App\Services\SheetsService;
 
 class Buscar extends Component
 {
@@ -11,15 +11,8 @@ class Buscar extends Component
     public array $items = [];
     public ?string $error = null;
 
-    public function mount()
-    {
-        $this->cargar();
-    }
-
-    public function updatedQ()
-    {
-        $this->cargar();
-    }
+    public function mount() { $this->cargar(); }
+    public function updatedQ() { $this->cargar(); }
 
     private function cargar(): void
     {
@@ -28,11 +21,13 @@ class Buscar extends Component
         if (!$ssid) { $this->items = []; return; }
 
         try {
-            // leer índice completo (desde A2 por si hay cabeceras)
-            $values = app(Sheets::class)
-                ->spreadsheets_values
-                ->get($ssid, 'IndicePacientes!A2:C10000')
-                ->getValues() ?? [];
+
+            $s = SheetsService::make();
+
+            // aseguramos la pestaña y leemos
+            $ref = 'IndicePacientes!A2:C10000';
+            $s->ensureIndiceSheet($ssid); // <-- agrega este método como public en tu SheetsService si no lo está
+            $values = $s->sheets->spreadsheets_values->get($ssid, $ref)->getValues() ?? [];
 
             $rows = array_map(fn($r) => [
                 'nombre' => $r[0] ?? '',
@@ -51,8 +46,7 @@ class Buscar extends Component
         }
     }
 
-    public function render()
-    {
+    public function render() {
         return view('livewire.pacientes.buscar')->layout('components.layouts.app');
     }
 }
