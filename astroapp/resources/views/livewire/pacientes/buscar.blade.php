@@ -1,33 +1,38 @@
-<div class="p-6 max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold mb-4">Pacientes</h1>
-  <input wire:model.debounce.300ms="q" type="text" placeholder="Buscar por primeras letras…"
-         class="w-full border rounded-xl px-4 py-3 text-lg" />
 
-  <div class="mt-4 space-y-2">
-    @foreach($items as $it)
-      <a href="{{ route('paciente.editar', $it['id']) }}"
-         class="block border rounded-xl px-4 py-3 hover:bg-gray-50">
-        <div class="font-semibold">{{ $it['nombre'] }}</div>
-        <div class="text-sm text-gray-500">Última actualización: {{ $it['ts'] }}</div>
-      </a>
-    @endforeach
+<div class="max-w-3xl mx-auto p-6 space-y-6">
+  <h1 class="text-2xl font-bold">Pacientes</h1>
+
+  @if($error)
+    <div class="bg-red-50 text-red-800 p-3 rounded">
+      {{ $error }}
+    </div>
+  @endif
+
+  <form action="{{ route('paciente.crear') }}" method="POST" class="flex gap-3 items-end">
+    @csrf
+    <div class="flex-1">
+      <label class="block text-sm font-medium mb-1">Nombre y Apellido</label>
+      <input name="nombre_apellido" required class="w-full border rounded p-2" placeholder="Ej: Ana Pérez">
+    </div>
+    <button class="bg-emerald-600 text-white px-4 py-2 rounded">+ Nuevo paciente</button>
+  </form>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">Buscar por primeras letras…</label>
+    <input type="text" wire:model.debounce.300ms="q" class="w-full border rounded p-2" placeholder="Ej: Mo, Pe, An…">
   </div>
 
-  <div class="mt-6">
-    <a href="#" onclick="document.getElementById('nuevo').showModal();return false;"
-       class="inline-block bg-emerald-600 text-white px-4 py-2 rounded-xl">+ Nuevo paciente</a>
-  </div>
-
-    <dialog id="nuevo" class="rounded-xl p-0">
-    <form method="POST" action="{{ route('paciente.crear') }}" class="p-4">
-        @csrf
-        <label class="text-sm">Nombre y Apellido</label>
-        <input name="nombre_apellido" class="w-full border rounded-xl px-3 py-2" required>
-        <div class="mt-3 flex gap-2">
-        <button class="bg-emerald-600 text-white px-4 py-2 rounded-xl">Crear</button>
-        <button type="button" onclick="this.closest('dialog').close()" class="border px-4 py-2 rounded-xl">Cancelar</button>
+  <div class="bg-white rounded shadow divide-y">
+    @forelse($items as $it)
+      <a class="flex items-center justify-between p-3 hover:bg-gray-50" href="{{ route('paciente.editar', $it['id']) }}">
+        <div>
+          <div class="font-medium">{{ $it['nombre'] }}</div>
+          <div class="text-xs text-gray-500">ID: {{ $it['id'] }} · {{ $it['ts'] }}</div>
         </div>
-    </form>
-    </dialog>
-
+        <div title="Editar" class="text-gray-400">➕</div>
+      </a>
+    @empty
+      <div class="p-3 text-gray-500">No hay pacientes aún.</div>
+    @endforelse
+  </div>
 </div>

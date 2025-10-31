@@ -5,16 +5,109 @@ namespace App\Services;
 use Google\Service\Sheets;
 use Google\Service\Sheets\ValueRange;
 
-class SheetsService {
+class SheetsService
+{
     public function __construct(private readonly Sheets $sheets) {}
 
-    public static function make(): self {
+    public static function make(): self
+    {
         $client = GoogleClientFactory::make();
         return new self(new Sheets($client));
     }
 
-    public function getPerfil(string $spreadsheetId): array {
-        $range = 'Perfil!A1:B39';
+    /* ======================= Helpers de pestañas ======================= */
+
+    /** Asegura que exista una pestaña con $title.
+     *  - Si hay 1 sola (Sheet1/Hoja 1), la renombra.
+     *  - Si no existe, la crea.
+     */
+    private function ensureSheet(string $spreadsheetId, string $title): void
+    {
+        $ss = $this->sheets->spreadsheets->get($spreadsheetId, [
+            'fields' => 'sheets(properties(sheetId,title))'
+        ]);
+        $sheets = $ss->getSheets() ?? [];
+
+        foreach ($sheets as $s) {
+            if (($s->getProperties()->getTitle() ?? '') === $title) {
+                return; // ya existe
+            }
+        }
+
+        if (count($sheets) === 1) {
+            $sid = $sheets[0]->getProperties()->getSheetId();
+            $requests = [
+                new \Google\Service\Sheets\Request([
+                    'updateSheetProperties' => [
+                        'properties' => ['sheetId' => $sid, 'title' => $title],
+                        'fields' => 'title',
+                    ],
+                ]),
+            ];
+            $this->sheets->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            );
+            return;
+        }
+
+        // en otros casos, crear una pestaña nueva
+        $requests = [
+            new \Google\Service\Sheets\Request([
+                'addSheet' => ['properties' => ['title' => $title]],
+            ]),
+        ];
+        $this->sheets->spreadsheets->batchUpdate(
+            $spreadsheetId,
+            new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+        );
+    }
+
+    private function ensurePerfil(string $spreadsheetId): void
+    {
+        $this->ensureSheet($spreadsheetId, 'Perfil');
+    }
+
+    private function ensureEncuentros(string $spreadsheetId): void
+    {
+        $this->ensureSheet($spreadsheetId, 'Encuentros');
+
+        // Cabeceras siempre en A1:E1
+        $headers = new ValueRange([
+            'values' => [[
+                'FECHA','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN','EDAD_EN_ESE_ENCUENTRO'
+            ]],
+        ]);
+        $this->sheets->spreadsheets_values->update(
+            $spreadsheetId,
+            'Encuentros!A1:E1',
+            $headers,
+            ['valueInputOption' => 'RAW']
+        );
+    }
+
+    private function ensureIndice(string $spreadsheetId): void
+    {
+        $this->ensureSheet($spreadsheetId, 'IndicePacientes');
+
+        $headers = new ValueRange([
+            'values' => [[ 'NOMBRE_APELLIDO', 'SPREADSHEET_ID', 'ULTIMA_ACTUALIZACION' ]],
+        ]);
+        $this->sheets->spreadsheets_values->update(
+            $spreadsheetId,
+            'IndicePacientes!A1:C1',
+            $headers,
+            ['valueInputOption' => 'RAW']
+        );
+    }
+
+    /* ======================= Perfil ======================= */
+
+    public function getPerfil(string $spreadsheetId): array
+    {
+        $this->ensurePerfil($spreadsheetId);
+
+        $range  = 'Perfil!A1:B39';
         $values = $this->sheets->spreadsheets_values->get($spreadsheetId, $range)->getValues() ?? [];
         $out = [];
         foreach ($values as $row) {
@@ -25,9 +118,11 @@ class SheetsService {
         return $out;
     }
 
-    public function setPerfil(string $spreadsheetId, array $kv): void {
-        // Espera claves EXACTAS en la columna A del template (A1..A39).
-        // Construye un arreglo de dos columnas A/B en el mismo orden.
+    public function setPerfil(string $spreadsheetId, array $kv): void
+    {
+        $this->ensurePerfil($spreadsheetId);
+
+        // Claves de la columna A (orden fijo)
         $keys = [
             'NOMBRE_Y_APELLIDO','FOTO_URL','CONTACTO','FECHA_NAC','HORA_NAC',
             'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
@@ -39,56 +134,23 @@ class SheetsService {
             'VIVO_CON','HOGAR_INFANCIA','ENF_INFANCIA','SINTOMAS_ACTUALES','MOTIVO_CONSULTA',
             'DETALLE_ENCUENTRO_INICIAL','RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO','ULTIMA_ACTUALIZACION'
         ];
+
         $rows = array_map(fn($k) => [$k, $kv[$k] ?? ''], $keys);
         $body = new ValueRange(['values' => $rows]);
-        $this->sheets->spreadsheets_values->update($spreadsheetId, 'Perfil!A1:B39', $body, ['valueInputOption' => 'RAW']);
-    }
 
-    public function appendEncuentro(string $spreadsheetId, array $enc): void {
-        $row = [
-            $enc['FECHA'] ?? '',
-            $enc['CIUDAD_ULT_CUMPLE'] ?? '',
-            $enc['TEMAS_TRATADOS'] ?? '',
-            $enc['RESUMEN'] ?? '',
-            $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '',
-        ];
-        $body = new ValueRange(['values' => [ $row ]]);
-        $this->sheets->spreadsheets_values->append($spreadsheetId, 'Encuentros!A1:E1', $body, ['valueInputOption' => 'RAW']);
-    }
-
-    public function updateIndice(string $indiceSpreadsheetId, array $fila): void {
-        // fila = [NOMBRE_APELLIDO, SPREADSHEET_ID, ULTIMA_ACTUALIZACION]
-        $body = new ValueRange(['values' => [ $fila ]]);
-        $this->sheets->spreadsheets_values->append($indiceSpreadsheetId, 'IndicePacientes!A1:C1', $body, ['valueInputOption' => 'RAW']);
-    }
-
-    public function createSpreadsheet(string $title): string {
-        $req = new \Google\Service\Sheets\Spreadsheet([
-            'properties' => ['title' => $title]
-        ]);
-        $sheet = $this->sheets->spreadsheets->create($req, ['fields' => 'spreadsheetId']);
-        return $sheet->spreadsheetId;
-    }
-
-    public function ensureEncuentrosSheet(string $spreadsheetId): void {
-        // Crea hoja Encuentros con cabeceras
-        $requests = [
-            new \Google\Service\Sheets\Request(['addSheet' => ['properties' => ['title' => 'Encuentros']]]),
-        ];
-        $this->sheets->spreadsheets->batchUpdate(
+        $this->sheets->spreadsheets_values->update(
             $spreadsheetId,
-            new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            'Perfil!A1:B'.count($rows),
+            $body,
+            ['valueInputOption' => 'RAW']
         );
-
-        $headers = new \Google\Service\Sheets\ValueRange([
-            'values' => [[
-                'FECHA','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN','EDAD_EN_ESE_ENCUENTRO'
-            ]]
-        ]);
-        $this->sheets->spreadsheets_values->update($spreadsheetId, 'Encuentros!A1:E1', $headers, ['valueInputOption' => 'RAW']);
     }
 
-    public function seedPerfil(string $spreadsheetId): void {
+    /** Si llamás a esto en la creación inicial, deja la pestaña Perfil con las claves listas. */
+    public function seedPerfil(string $spreadsheetId): void
+    {
+        $this->ensurePerfil($spreadsheetId);
+
         $keys = [
             'NOMBRE_Y_APELLIDO','FOTO_URL','CONTACTO','FECHA_NAC','HORA_NAC',
             'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
@@ -101,9 +163,70 @@ class SheetsService {
             'SINTOMAS_ACTUALES','MOTIVO_CONSULTA','DETALLE_ENCUENTRO_INICIAL',
             'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO','ULTIMA_ACTUALIZACION'
         ];
+
         $rows = array_map(fn($k) => [$k, ''], $keys);
-        $body = new \Google\Service\Sheets\ValueRange(['values' => $rows]);
-        $this->sheets->spreadsheets_values->update($spreadsheetId, 'Perfil!A1:B'.count($rows), $body, ['valueInputOption' => 'RAW']);
+        $body = new ValueRange(['values' => $rows]);
+
+        $this->sheets->spreadsheets_values->update(
+            $spreadsheetId,
+            'Perfil!A1:B'.count($rows),
+            $body,
+            ['valueInputOption' => 'RAW']
+        );
     }
 
+    /* ======================= Encuentros ======================= */
+
+    public function ensureEncuentrosSheet(string $spreadsheetId): void
+    {
+        $this->ensureEncuentros($spreadsheetId);
+    }
+
+    public function appendEncuentro(string $spreadsheetId, array $enc): void
+    {
+        $this->ensureEncuentros($spreadsheetId);
+
+        $row = [
+            $enc['FECHA'] ?? '',
+            $enc['CIUDAD_ULT_CUMPLE'] ?? '',
+            $enc['TEMAS_TRATADOS'] ?? '',
+            $enc['RESUMEN'] ?? '',
+            $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '',
+        ];
+        $body = new ValueRange(['values' => [ $row ]]);
+
+        $this->sheets->spreadsheets_values->append(
+            $spreadsheetId,
+            'Encuentros!A1:E1',
+            $body,
+            ['valueInputOption' => 'RAW']
+        );
+    }
+
+    /* ======================= Índice ======================= */
+
+    public function updateIndice(string $indiceSpreadsheetId, array $fila): void
+    {
+        // fila = [NOMBRE_APELLIDO, SPREADSHEET_ID, ULTIMA_ACTUALIZACION]
+        $this->ensureIndice($indiceSpreadsheetId);
+
+        $body = new ValueRange(['values' => [ $fila ]]);
+        $this->sheets->spreadsheets_values->append(
+            $indiceSpreadsheetId,
+            'IndicePacientes!A1:C1',
+            $body,
+            ['valueInputOption' => 'RAW']
+        );
+    }
+
+    /* ======================= Utilidad ======================= */
+
+    public function createSpreadsheet(string $title): string
+    {
+        $req = new \Google\Service\Sheets\Spreadsheet([
+            'properties' => ['title' => $title],
+        ]);
+        $sheet = $this->sheets->spreadsheets->create($req, ['fields' => 'spreadsheetId']);
+        return $sheet->spreadsheetId;
+    }
 }

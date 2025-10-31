@@ -28,7 +28,7 @@ class GoogleAuthController extends Controller
 
     public function callback(Request $r) {
         $code = $r->query('code');
-        abort_if(!$code, 400, 'Missing code');
+        abort_if(!$code, 400, 'Falta el code');
 
         $client = $this->makeClient();
         $token = $client->fetchAccessTokenWithAuthCode($code);
@@ -37,6 +37,12 @@ class GoogleAuthController extends Controller
         @mkdir(storage_path('app/google'), 0777, true);
         file_put_contents(storage_path('app/google/token.json'), json_encode($token));
 
-        return redirect()->route('buscar')->with('ok', 'Google conectado ✔');
+        return redirect()->route('home')->with('ok', 'Conectado a Google ✔');
+    }
+
+    public function logout() {
+        @unlink(storage_path('app/google/token.json'));
+        return redirect()->route('home')->with('ok', 'Desconectado de Google');
     }
 }
+

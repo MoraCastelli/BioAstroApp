@@ -27,7 +27,7 @@ class PacienteRepository
         $drive  = \App\Services\DriveService::make();
         $sheets = $this->sheets;
 
-        // 1) Crear spreadsheet directamente en la carpeta "Base de Datos" con Drive
+        // 1) Crear spreadsheet directo en carpeta "Base de Datos" usando Drive
         $spreadsheetId = $drive->createSpreadsheetInFolder(
             $this->fileName($nombreApellido),
             config('services.google.db_folder_id')
