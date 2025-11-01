@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\GoogleRetry;
 use Google\Service\Sheets;
 use Google\Service\Sheets\ValueRange;
 
@@ -17,15 +18,14 @@ class SheetsService
 
     /* ======================= Helpers de pestañas ======================= */
 
-    /** Asegura que exista una pestaña con $title.
-     *  - Si hay 1 sola (Sheet1/Hoja 1), la renombra.
-     *  - Si no existe, la crea.
-     */
+    /** Asegura que exista una pestaña con $title. Renombra si hay una sola hoja. */
     private function ensureSheet(string $spreadsheetId, string $title): void
     {
-        $ss = $this->sheets->spreadsheets->get($spreadsheetId, [
-            'fields' => 'sheets(properties(sheetId,title))'
-        ]);
+        $ss = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->get($spreadsheetId, [
+                'fields' => 'sheets(properties(sheetId,title))'
+            ])
+        );
         $sheets = $ss->getSheets() ?? [];
 
         foreach ($sheets as $s) {
@@ -40,26 +40,30 @@ class SheetsService
                 new \Google\Service\Sheets\Request([
                     'updateSheetProperties' => [
                         'properties' => ['sheetId' => $sid, 'title' => $title],
-                        'fields' => 'title',
+                        'fields'     => 'title',
                     ],
                 ]),
             ];
-            $this->sheets->spreadsheets->batchUpdate(
-                $spreadsheetId,
-                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            GoogleRetry::call(fn() =>
+                $this->sheets->spreadsheets->batchUpdate(
+                    $spreadsheetId,
+                    new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+                )
             );
             return;
         }
 
-        // en otros casos, crear una pestaña nueva
+        // crear pestaña nueva
         $requests = [
             new \Google\Service\Sheets\Request([
                 'addSheet' => ['properties' => ['title' => $title]],
             ]),
         ];
-        $this->sheets->spreadsheets->batchUpdate(
-            $spreadsheetId,
-            new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            )
         );
     }
 
@@ -72,17 +76,20 @@ class SheetsService
     {
         $this->ensureSheet($spreadsheetId, 'Encuentros');
 
-        // Cabeceras siempre en A1:E1
+        // Cabeceras en A1:E1
         $headers = new ValueRange([
             'values' => [[
                 'FECHA','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN','EDAD_EN_ESE_ENCUENTRO'
             ]],
         ]);
-        $this->sheets->spreadsheets_values->update(
-            $spreadsheetId,
-            'Encuentros!A1:E1',
-            $headers,
-            ['valueInputOption' => 'RAW']
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Encuentros!A1:E1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
         );
     }
 
@@ -91,14 +98,39 @@ class SheetsService
         $this->ensureSheet($spreadsheetId, 'IndicePacientes');
 
         $headers = new ValueRange([
-            'values' => [[ 'NOMBRE_APELLIDO', 'SPREADSHEET_ID', 'ULTIMA_ACTUALIZACION' ]],
+            'values' => [[ 'NOMBRE_APELLIDO','SPREADSHEET_ID','ULTIMA_ACTUALIZACION' ]],
         ]);
-        $this->sheets->spreadsheets_values->update(
-            $spreadsheetId,
-            'IndicePacientes!A1:C1',
-            $headers,
-            ['valueInputOption' => 'RAW']
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'IndicePacientes!A1:C1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
         );
+    }
+
+    public function ensureIndiceSheet(string $indiceSpreadsheetId): void
+    {
+        $this->ensureIndice($indiceSpreadsheetId);
+    }
+
+    public function readIndice(string $indiceSpreadsheetId): array
+    {
+        $this->ensureIndice($indiceSpreadsheetId);
+
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                 ->get($indiceSpreadsheetId, 'IndicePacientes!A2:C10000')
+                 ->getValues() ?? []
+        );
+
+        return array_values(array_map(fn($r) => [
+            'nombre' => $r[0] ?? '',
+            'id'     => $r[1] ?? '',
+            'ts'     => $r[2] ?? '',
+        ], $values));
     }
 
     /* ======================= Perfil ======================= */
@@ -108,7 +140,10 @@ class SheetsService
         $this->ensurePerfil($spreadsheetId);
 
         $range  = 'Perfil!A1:B39';
-        $values = $this->sheets->spreadsheets_values->get($spreadsheetId, $range)->getValues() ?? [];
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($spreadsheetId, $range)->getValues() ?? []
+        );
+
         $out = [];
         foreach ($values as $row) {
             $k = $row[0] ?? '';
@@ -122,7 +157,6 @@ class SheetsService
     {
         $this->ensurePerfil($spreadsheetId);
 
-        // Claves de la columna A (orden fijo)
         $keys = [
             'NOMBRE_Y_APELLIDO','FOTO_URL','CONTACTO','FECHA_NAC','HORA_NAC',
             'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
@@ -138,15 +172,17 @@ class SheetsService
         $rows = array_map(fn($k) => [$k, $kv[$k] ?? ''], $keys);
         $body = new ValueRange(['values' => $rows]);
 
-        $this->sheets->spreadsheets_values->update(
-            $spreadsheetId,
-            'Perfil!A1:B'.count($rows),
-            $body,
-            ['valueInputOption' => 'RAW']
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Perfil!A1:B'.count($rows),
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
         );
     }
 
-    /** Si llamás a esto en la creación inicial, deja la pestaña Perfil con las claves listas. */
+    /** Inicializa la pestaña Perfil con todas las claves vacías. */
     public function seedPerfil(string $spreadsheetId): void
     {
         $this->ensurePerfil($spreadsheetId);
@@ -167,11 +203,13 @@ class SheetsService
         $rows = array_map(fn($k) => [$k, ''], $keys);
         $body = new ValueRange(['values' => $rows]);
 
-        $this->sheets->spreadsheets_values->update(
-            $spreadsheetId,
-            'Perfil!A1:B'.count($rows),
-            $body,
-            ['valueInputOption' => 'RAW']
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Perfil!A1:B'.count($rows),
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
         );
     }
 
@@ -195,11 +233,13 @@ class SheetsService
         ];
         $body = new ValueRange(['values' => [ $row ]]);
 
-        $this->sheets->spreadsheets_values->append(
-            $spreadsheetId,
-            'Encuentros!A1:E1',
-            $body,
-            ['valueInputOption' => 'RAW']
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->append(
+                $spreadsheetId,
+                'Encuentros!A1:E1',
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
         );
     }
 
@@ -207,15 +247,17 @@ class SheetsService
 
     public function updateIndice(string $indiceSpreadsheetId, array $fila): void
     {
-        // fila = [NOMBRE_APELLIDO, SPREADSHEET_ID, ULTIMA_ACTUALIZACION]
         $this->ensureIndice($indiceSpreadsheetId);
 
         $body = new ValueRange(['values' => [ $fila ]]);
-        $this->sheets->spreadsheets_values->append(
-            $indiceSpreadsheetId,
-            'IndicePacientes!A1:C1',
-            $body,
-            ['valueInputOption' => 'RAW']
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->append(
+                $indiceSpreadsheetId,
+                'IndicePacientes!A1:C1',
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
         );
     }
 
@@ -226,7 +268,11 @@ class SheetsService
         $req = new \Google\Service\Sheets\Spreadsheet([
             'properties' => ['title' => $title],
         ]);
-        $sheet = $this->sheets->spreadsheets->create($req, ['fields' => 'spreadsheetId']);
+
+        $sheet = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->create($req, ['fields' => 'spreadsheetId'])
+        );
+
         return $sheet->spreadsheetId;
     }
 }

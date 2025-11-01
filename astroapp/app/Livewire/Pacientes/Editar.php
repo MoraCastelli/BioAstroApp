@@ -2,18 +2,25 @@
 
 namespace App\Livewire\Pacientes;
 
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use App\Services\SheetsService;
-use App\Repositories\PacienteRepository;
+use App\Services\DriveService;
 use Carbon\Carbon;
 
 class Editar extends Component
 {
-    public string $id;             // spreadsheetId del paciente
-    public array $perfil = [];     // Perfil!A1:B...
+    use WithFileUploads;
+
+    public string $id;
+    public array $perfil = [];
     public string $mensaje = '';
 
-    // Sección 15: nuevo encuentro (se guarda en hoja Encuentros)
+    // Upload local temporal (drag & drop o selector)
+    public $fotoUpload;
+
     public array $nuevoEncuentro = [
         'FECHA' => '',
         'CIUDAD_ULT_CUMPLE' => '',
@@ -22,7 +29,6 @@ class Editar extends Component
         'EDAD_EN_ESE_ENCUENTRO' => '',
     ];
 
-    // Opciones de la Fase de Lunación (11) y su planeta asociado
     public array $fasesLunacion = [
         'Luna Nueva' => 'Sol',
         'Creciente Iluminante' => 'Marte',
@@ -38,6 +44,7 @@ class Editar extends Component
         'perfil.NOMBRE_Y_APELLIDO' => 'required|min:2',
         'perfil.FECHA_NAC' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
         'perfil.HORA_NAC'  => 'nullable|string|max:10',
+        'perfil.ANIO_NAC'  => 'nullable|string|max:4',
         'perfil.CIUDAD_NAC' => 'nullable|string|max:80',
         'perfil.PROVINCIA_NAC' => 'nullable|string|max:80',
         'perfil.PAIS_NAC' => 'nullable|string|max:80',
@@ -46,11 +53,10 @@ class Editar extends Component
         'perfil.SIGNO_SOLAR' => 'nullable|string|max:30',
         'perfil.FASE_LUNACION_NATAL' => 'nullable|string',
         'perfil.RESUMEN_PARA_PSICOLOGA_URL_AUDIO' => 'nullable|url',
-        // … el resto quedan como string|nullable por simplicidad
+
+        // Upload imagen (drag & drop)
+        'fotoUpload' => 'nullable|image|max:5120', // 5MB
         'nuevoEncuentro.FECHA' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
-        'nuevoEncuentro.CIUDAD_ULT_CUMPLE' => 'nullable|string|max:120',
-        'nuevoEncuentro.TEMAS_TRATADOS' => 'nullable|string',
-        'nuevoEncuentro.RESUMEN' => 'nullable|string',
     ];
 
     public function mount($id)
@@ -58,7 +64,6 @@ class Editar extends Component
         $this->id = $id;
         $this->perfil = SheetsService::make()->getPerfil($id);
 
-        // Asegurar claves faltantes del template
         $defaults = [
             'NOMBRE_Y_APELLIDO' => '',
             'FOTO_URL' => '',
@@ -105,7 +110,6 @@ class Editar extends Component
 
     public function updatedPerfil($value, $key)
     {
-        // 6) Edad automática al cambiar fechas
         if (in_array($key, ['FECHA_NAC', 'FECHA_ENCUENTRO_INICIAL'])) {
             $this->perfil['EDAD_EN_ENCUENTRO_INICIAL'] = $this->calcularEdad(
                 $this->perfil['FECHA_NAC'] ?? null,
@@ -113,7 +117,6 @@ class Editar extends Component
             );
         }
 
-        // 11) Planeta asociado según fase
         if ($key === 'FASE_LUNACION_NATAL') {
             $fase = $this->perfil['FASE_LUNACION_NATAL'] ?? '';
             $this->perfil['PLANETA_ASOCIADO_LUNACION'] = $this->fasesLunacion[$fase] ?? '';
@@ -134,38 +137,84 @@ class Editar extends Component
 
     public function guardar()
     {
+        $this->dispatch('ui-loading', true);
         $this->validate();
 
-        // Recalcular edad por las dudas
         $this->perfil['EDAD_EN_ENCUENTRO_INICIAL'] = $this->calcularEdad(
             $this->perfil['FECHA_NAC'] ?? null,
             $this->perfil['FECHA_ENCUENTRO_INICIAL'] ?? null
         );
-
-        // Timestamp
         $this->perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
 
-        // Guardar en Sheets
         SheetsService::make()->setPerfil($this->id, $this->perfil);
 
-        // (Opcional) regenerar PDF + subir a Drive aquí si ya lo tenías armado…
-
+        // PDF (si ya lo tenías armado, acá iría regeneración + subida)
         $this->mensaje = 'Perfil guardado correctamente ✔';
-        $this->dispatch('guardado-ok'); // por si querés toasts
+
+        $this->dispatch('guardado-ok');         // toast si querés
+        $this->dispatch('scroll-top');          // scrollear arriba
+        $this->dispatch('ui-loading', false);   // apagar loader
     }
+
+    public function subirFoto()
+    {
+        // 1) Validar que haya archivo
+        $this->validateOnly('fotoUpload'); // 'image|max:5120' ya lo tenías
+        if (!$this->fotoUpload) {
+            $this->mensaje = 'No hay archivo para subir.';
+            return;
+        }
+
+        // 2) Guardar el tmp local de forma segura
+        //    (livewire-tmp a veces se limpia; movelo a 'tmp' con nombre único)
+        $ext = strtolower($this->fotoUpload->getClientOriginalExtension() ?: 'jpg');
+        $tmpRelPath = $this->fotoUpload->storeAs('tmp', Str::uuid().'.'.$ext, 'local');
+        $abs = Storage::disk('local')->path($tmpRelPath);
+
+        if (!is_file($abs)) {
+            $this->mensaje = 'No se pudo guardar el archivo temporal.';
+            return;
+        }
+
+        // 3) Preparar nombre en Drive
+        $nombreBase = trim($this->perfil['NOMBRE_Y_APELLIDO'] ?: 'Paciente');
+        $nombre = $nombreBase.' - '.date('Ymd-His').'.'.$ext;
+
+        // 4) Asegurar carpeta y subir
+        $drive = \App\Services\DriveService::make();
+        $folderId = $drive->ensureFolderByName('Cartas Astrales'); // crea si no existe
+
+        try {
+            $fileId = $drive->uploadImageToFolder($abs, $nombre, $folderId);
+            $drive->makeAnyoneReader($fileId);
+
+            // probá primero con el thumbnail (suele cargar siempre) o la vista
+            //$publicUrl = $drive->getPublicContentUrl($fileId);
+            $publicUrl = $drive->getThumbnailUrl($fileId, 1000); // si preferís
+
+            $this->perfil['FOTO_URL'] = $publicUrl;
+            $this->mensaje = 'Imagen subida ✔';
+        } finally {
+            // 5) Limpiar el tmp local pase lo que pase
+            @Storage::disk('local')->delete($tmpRelPath);
+        }
+
+        // 6) Limpiar el input para que puedas subir otra
+        $this->fotoUpload = null;
+    }
+
 
     public function agregarEncuentro()
     {
+        $this->dispatch('ui-loading', true);
+
         $this->validateOnly('nuevoEncuentro.FECHA');
-        // Calcular edad en ese encuentro si hay FN
         $fn = $this->perfil['FECHA_NAC'] ?? null;
         $fe = $this->nuevoEncuentro['FECHA'] ?? null;
         $this->nuevoEncuentro['EDAD_EN_ESE_ENCUENTRO'] = $this->calcularEdad($fn, $fe);
 
-        // Agregar fila a Encuentros
         SheetsService::make()->appendEncuentro($this->id, $this->nuevoEncuentro);
 
-        // Limpiar parcial
         $this->nuevoEncuentro = [
             'FECHA' => '',
             'CIUDAD_ULT_CUMPLE' => '',
@@ -176,11 +225,11 @@ class Editar extends Component
 
         $this->mensaje = 'Encuentro agregado ✔';
         $this->dispatch('encuentro-ok');
+        $this->dispatch('ui-loading', false);
     }
 
     public function render()
     {
-        return view('livewire.pacientes.editar')
-            ->layout('components.layouts.app');
+        return view('livewire.pacientes.editar')->layout('components.layouts.app');
     }
 }

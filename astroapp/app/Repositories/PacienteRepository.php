@@ -27,17 +27,25 @@ class PacienteRepository
         $drive  = \App\Services\DriveService::make();
         $sheets = $this->sheets;
 
-        // 1) Crear spreadsheet directo en carpeta "Base de Datos" usando Drive
-        $spreadsheetId = $drive->createSpreadsheetInFolder(
-            $this->fileName($nombreApellido),
-            config('services.google.db_folder_id')
-        );
+        $folderId = (string) config('services.google.db_folder_id');
+        if ($folderId === '') {
+            throw new \RuntimeException('Falta services.google.db_folder_id');
+        }
 
-        // 2) Sembrar estructura con Sheets
+        $fileName = $this->fileName($nombreApellido);
+
+        // Idempotencia: si ya existe un archivo con ese nombre en la carpeta, reusarlo.
+        if ($existente = $drive->findByNameInFolder($folderId, $fileName)) {
+            $spreadsheetId = $existente;
+        } else {
+            $spreadsheetId = $drive->createSpreadsheetInFolder($fileName, $folderId);
+        }
+
+        // Estructura Sheets
         $sheets->seedPerfil($spreadsheetId);
         $sheets->ensureEncuentrosSheet($spreadsheetId);
 
-        // 3) Valores iniciales
+        // Valores iniciales
         $this->guardarPerfil($spreadsheetId, [
             'NOMBRE_Y_APELLIDO'    => $nombreApellido,
             'ULTIMA_ACTUALIZACION' => \Carbon\Carbon::now()->toIso8601String(),
@@ -45,7 +53,6 @@ class PacienteRepository
 
         return $spreadsheetId;
     }
-
 
 
     public function guardarPerfil(string $spreadsheetId, array $perfil): void
