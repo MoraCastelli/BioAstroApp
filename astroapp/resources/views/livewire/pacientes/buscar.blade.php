@@ -26,71 +26,100 @@
     </button>
   </form>
 
-{{-- Encuentro rápido --}}
-<div class="bg-white p-4 rounded-xl shadow border border-gray-100 space-y-4">
-  <h2 class="font-semibold text-lg">Agregar encuentro rápido</h2>
-  <p class="text-sm text-gray-600">Buscá un paciente, seleccionalo y agregá un nuevo encuentro sin entrar a editar.</p>
+  {{-- Encuentro rápido --}}
+  <div class="bg-white p-4 rounded-xl shadow border border-gray-100 space-y-4">
+    <h2 class="font-semibold text-lg">Agregar encuentro rápido</h2>
+    <p class="text-sm text-gray-600">Buscá un paciente, seleccionalo y agregá un encuentro sin entrar a editar.</p>
 
-  {{-- Buscador + listado compacto para selección --}}
-  <div>
-    <input
-      type="text"
-      wire:model.debounce.300ms="q"
-      class="w-full border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg p-2.5"
-      placeholder="Escribí las primeras letras del nombre…">
-  </div>
+    {{-- Buscador --}}
+    <div class="relative flex gap-2 items-center">
+      <input
+        type="text"
+        wire:keyup.debounce.200ms="buscar($event.target.value)"
+        class="flex-1 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg p-2.5"
+        placeholder="Escribí las primeras letras del nombre…">
+      
+      {{-- Botón Listo --}}
+      <button type="button"
+              wire:click="limpiarBusqueda"
+              class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-700 transition">
+        Listo
+      </button>
 
-  {{-- Form encuentro cuando hay selección --}}
-  @if($selId)
-    <div class="p-3 bg-gray-50 rounded-lg border text-sm">
-      <div class="mb-2 text-gray-700">
-        <span class="font-medium">Paciente seleccionado:</span>
-        <span>{{ $selNombre }}</span>
-      </div>
-
-      <div class="grid md:grid-cols-5 gap-3 items-end">
-        <div>
-          <label class="block text-xs text-gray-700">Fecha (DD/MM/AAAA)</label>
-          <input type="text" wire:model.lazy="enc.FECHA"
-                 class="w-full border border-gray-300 rounded-lg p-2" placeholder="10/08/2025">
-          @error('enc.FECHA') <p class="text-red-600 text-xs">{{ $message }}</p> @enderror
-        </div>
-        <div>
-          <label class="block text-xs text-gray-700">Ciudad último cumple</label>
-          <input type="text" wire:model.defer="enc.CIUDAD_ULT_CUMPLE" class="w-full border rounded-lg p-2">
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-xs text-gray-700">Temas tratados</label>
-          <input type="text" wire:model.defer="enc.TEMAS_TRATADOS" class="w-full border rounded-lg p-2">
-        </div>
-        <div>
-          <label class="block text-xs text-gray-700">Edad (auto)</label>
-          <input type="text" class="w-full border rounded-lg p-2 bg-gray-100"
-                 value="{{ $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '' }}" readonly>
-        </div>
-        <div class="md:col-span-5">
-          <label class="block text-xs text-gray-700">Resumen</label>
-          <textarea wire:model.defer="enc.RESUMEN" rows="2"
-                    class="w-full border border-gray-300 rounded-lg p-2"></textarea>
-        </div>
-      </div>
-
-      <div class="mt-3">
-        <button type="button"
-                wire:click="agregarEncuentroRapido"
-                wire:loading.attr="disabled"
-                wire:target="agregarEncuentroRapido"
-                class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition">
-          Agregar encuentro
-          <span wire:loading wire:target="agregarEncuentroRapido" class="ml-2 text-white/80 text-xs">Agregando…</span>
-        </button>
-        @if($msgEncuentro)
-          <span class="ml-3 text-emerald-700">{{ $msgEncuentro }}</span>
-        @endif
+      <div class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500" wire:loading wire:target="buscar">
+        buscando…
       </div>
     </div>
-  @endif
-</div>
+
+
+    {{-- Sugerencias (solo si hay texto) --}}
+    @if(trim($q) !== '')
+      <div class="mt-2 max-h-56 overflow-auto border rounded-lg divide-y">
+        @forelse($sugs as $sg)
+          <button type="button"
+                  wire:key="sug-{{ $sg['id'] }}"
+                  wire:click="seleccionarPaciente('{{ $sg['id'] }}')"
+                  class="w-full text-left p-2 hover:bg-gray-50">
+            {{ $sg['nombre'] }}
+          </button>
+        @empty
+          <div class="p-2 text-gray-500 text-sm">Sin resultados</div>
+        @endforelse
+      </div>
+    @endif
+
+
+    {{-- Form encuentro cuando hay selección --}}
+    @if($selId)
+      <div class="p-3 bg-gray-50 rounded-lg border text-sm">
+        <div class="mb-2 text-gray-700">
+          <span class="font-medium">Paciente seleccionado:</span>
+          <span>{{ $selNombre }}</span>
+        </div>
+
+        <div class="grid md:grid-cols-5 gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-700">Fecha (DD/MM/AAAA)</label>
+            <input type="text" wire:model.lazy="enc.FECHA"
+                  class="w-full border border-gray-300 rounded-lg p-2" placeholder="10/08/2025">
+            @error('enc.FECHA') <p class="text-red-600 text-xs">{{ $message }}</p> @enderror
+          </div>
+          <div>
+            <label class="block text-xs text-gray-700">Ciudad último cumple</label>
+            <input type="text" wire:model.defer="enc.CIUDAD_ULT_CUMPLE" class="w-full border rounded-lg p-2">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs text-gray-700">Temas tratados</label>
+            <input type="text" wire:model.defer="enc.TEMAS_TRATADOS" class="w-full border rounded-lg p-2">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-700">Edad (auto)</label>
+            <input type="text" class="w-full border rounded-lg p-2 bg-gray-100"
+                  value="{{ $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '' }}" readonly>
+          </div>
+          <div class="md:col-span-5">
+            <label class="block text-xs text-gray-700">Resumen</label>
+            <textarea wire:model.defer="enc.RESUMEN" rows="2"
+                      class="w-full border border-gray-300 rounded-lg p-2"></textarea>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <button type="button"
+                  wire:click="agregarEncuentroRapido"
+                  wire:loading.attr="disabled"
+                  wire:target="agregarEncuentroRapido"
+                  class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition">
+            Agregar encuentro
+            <span wire:loading wire:target="agregarEncuentroRapido" class="ml-2 text-white/80 text-xs">Agregando…</span>
+          </button>
+          @if($msgEncuentro)
+            <span class="ml-3 text-emerald-700">{{ $msgEncuentro }}</span>
+          @endif
+        </div>
+      </div>
+    @endif
+  </div>
 
 
   {{-- Lista --}}
