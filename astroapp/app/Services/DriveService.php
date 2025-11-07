@@ -16,26 +16,6 @@ class DriveService
         return new self(new Drive($client));
     }
 
-    /** Busca por nombre dentro de una carpeta y devuelve el ID si existe. */
-    public function findByNameInFolder(string $folderId, string $name): ?string
-    {
-        $q = sprintf(
-            "name = '%s' and '%s' in parents and trashed = false",
-            addslashes($name),
-            $folderId
-        );
-
-        $res = GoogleRetry::call(fn() =>
-            $this->drive->files->listFiles([
-                'q' => $q,
-                'fields' => 'files(id,name)',
-                'pageSize' => 1
-            ])
-        );
-
-        return count($res->files) ? $res->files[0]->id : null;
-    }
-
     public function deleteByNameInFolder(string $folderId, string $name): void
     {
         $q = sprintf("name = '%s' and '%s' in parents and trashed = false", addslashes($name), $folderId);
@@ -208,6 +188,24 @@ class DriveService
 
         return $file->id;
     }
+
+    public function findByNameInFolder(string $folderId, string $name): ?string
+    {
+        $q = sprintf(
+            "name = '%s' and '%s' in parents and trashed = false",
+            addslashes($name),
+            $folderId
+        );
+
+        $res = $this->drive->files->listFiles([
+            'q' => $q,
+            'fields' => 'files(id,name)',
+            'pageSize' => 1,
+        ]);
+
+        return (count($res->files) > 0) ? $res->files[0]->id : null;
+    }
+
 
     public function getShareLink(string $fileId): string
     {

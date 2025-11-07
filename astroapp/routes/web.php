@@ -4,6 +4,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\PacienteController;
 use App\Livewire\Pacientes\Buscar;
 use App\Livewire\Pacientes\Editar;
+use App\Livewire\Pacientes\Ver;
 
 // Home mínima
 Route::get('/', function () {
@@ -18,6 +19,8 @@ Route::post('/google/logout', [GoogleAuthController::class, 'logout'])->name('go
 
 // Rutas que usan Drive/Sheets (requieren estar logueado con Google)
 Route::middleware([\App\Http\Middleware\EnsureGoogleConnected::class])->group(function () {
+    Route::get('/pacientes/{id}/ver', Ver::class)->name('paciente.ver');
+    
     // LISTAR/BUSCAR (GET)  -> NO crea nada, solo muestra
     Route::get('/pacientes', Buscar::class)->name('buscar');
 

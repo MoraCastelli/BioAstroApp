@@ -261,6 +261,26 @@ class SheetsService
         );
     }
 
+    public function readEncuentros(string $spreadsheetId): array
+    {
+        // Asegura que exista la hoja y cabeceras
+        $this->ensureEncuentrosSheet($spreadsheetId);
+
+        $values = $this->sheets->spreadsheets_values
+            ->get($spreadsheetId, 'Encuentros!A2:E100000')
+            ->getValues() ?? [];
+
+        // Map a claves esperadas
+        return array_values(array_map(fn($r) => [
+            'FECHA'                   => $r[0] ?? '',
+            'CIUDAD_ULT_CUMPLE'       => $r[1] ?? '',
+            'TEMAS_TRATADOS'          => $r[2] ?? '',
+            'RESUMEN'                 => $r[3] ?? '',
+            'EDAD_EN_ESE_ENCUENTRO'   => $r[4] ?? '',
+        ], $values));
+    }
+
+
     /* ======================= Utilidad ======================= */
 
     public function createSpreadsheet(string $title): string
