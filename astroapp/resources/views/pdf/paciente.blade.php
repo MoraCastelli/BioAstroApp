@@ -1,116 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <title>{{ $perfil['NOMBRE_Y_APELLIDO'] ?? ($perfil['nombre'] ?? 'Paciente') }}</title>
   <style>
-    @page { margin: 25mm 18mm; }
-    body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; }
-    h1 { font-size: 22px; margin: 0 0 6px; }
-    h2 { font-size: 16px; margin: 14px 0 8px; }
-    .muted { color: #666; }
-    .row { margin-bottom: 6px; }
-    .label { width: 210px; display: inline-block; font-weight: bold; vertical-align: top; }
-    .box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-top: 8px; }
-    .mb8 { margin-bottom: 8px; }
-    .mb12 { margin-bottom: 12px; }
-    .mb16 { margin-bottom: 16px; }
-    .page-break { page-break-before: always; }
-    img.photo { max-width: 100%; max-height: 180px; display: block; margin: 8px 0 12px; }
-    .key { font-weight: bold; }
-    .mono { font-family: DejaVu Sans Mono, monospace; }
+    @page { margin: 2cm; }
+    body { font-family: DejaVu Sans, sans-serif; color: #222; line-height: 1.4; font-size: 11pt; }
+    h1, h2, h3 { margin: 0; color: #222; }
+    h1 { font-size: 24pt; text-align: center; margin-bottom: 20px; }
+    h2 { font-size: 14pt; border-bottom: 1px solid #ccc; margin-top: 25px; padding-bottom: 4px; }
+    h3 { font-size: 12pt; margin-top: 12px; }
+    .foto { width: 180px; height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid #ccc; margin: 0 auto 20px; display: block; }
+    .page-break { page-break-after: always; }
+    .label { font-weight: bold; color: #444; display: inline-block; width: 160px; vertical-align: top; }
+    .value { display: inline-block; width: calc(100% - 165px); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 10pt; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    th { background: #f0f0f0; font-weight: bold; }
+    .small { font-size: 10pt; color: #555; }
   </style>
 </head>
 <body>
 
-  {{-- ================== PÁGINA 1: PERFIL + PRIMER ENCUENTRO ================== --}}
-  <h1>{{ $perfil['NOMBRE_Y_APELLIDO'] ?? '' }}</h1>
-  <div class="muted mb12">Actualizado: {{ $perfil['ULTIMA_ACTUALIZACION'] ?? '' }}</div>
+{{-- =================== PÁGINA 1 =================== --}}
+@php
+  $nombre = trim($perfil['NOMBRE_Y_APELLIDO'] ?? ($perfil['nombre'] ?? 'Paciente sin nombre'));
+@endphp
 
-  @if(!empty($perfil['FOTO_URL']))
-    {{-- Si tu DomPDF tiene enable_remote=true, podés mostrar imagen remota --}}
-    <img class="photo" src="{{ $perfil['FOTO_URL'] }}" alt="Foto/Carta">
-  @endif
+<h1>{{ $nombre }}</h1>
 
-  <div class="row"><span class="label">Contacto:</span> {{ $perfil['CONTACTO'] ?? '' }}</div>
-  <div class="row"><span class="label">Fecha/Hora Nac.:</span>
-    {{ $perfil['FECHA_NAC'] ?? '' }} {{ $perfil['HORA_NAC'] ?? '' }}
-  </div>
-  <div class="row"><span class="label">Lugar Nac.:</span>
-    {{ $perfil['CIUDAD_NAC'] ?? '' }}, {{ $perfil['PROVINCIA_NAC'] ?? '' }}, {{ $perfil['PAIS_NAC'] ?? '' }}
-  </div>
+@if(!empty($perfil['FOTO_URL']))
+  <img src="{{ $perfil['FOTO_URL'] }}" class="foto" alt="Foto">
+@endif
 
-  <div class="row"><span class="label">Signo Solar:</span> {{ $perfil['SIGNO_SOLAR'] ?? '' }}</div>
-  <div class="row"><span class="label">Edad (encuentro inicial):</span> {{ $perfil['EDAD_EN_ENCUENTRO_INICIAL'] ?? '' }}</div>
+<h2>Resumen de encuentros</h2>
+@if(count($encuentros))
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Fecha</th>
+        <th>Edad</th>
+        <th>Ciudad Últ. Cumple</th>
+        <th>Temas tratados</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach($encuentros as $i => $e)
+        <tr>
+          <td>{{ $i + 1 }}</td>
+          <td>{{ $e['FECHA'] ?? '' }}</td>
+          <td>{{ is_numeric($e['EDAD_EN_ESE_ENCUENTRO'] ?? '') ? round($e['EDAD_EN_ESE_ENCUENTRO']) : ($e['EDAD_EN_ESE_ENCUENTRO'] ?? '') }}</td>
+          <td>{{ $e['CIUDAD_ULT_CUMPLE'] ?? '' }}</td>
+          <td>{{ $e['TEMAS_TRATADOS'] ?? '' }}</td>
+        </tr>
+      @endforeach
+    </tbody>
+  </table>
+@else
+  <p class="small">Aún no se registraron encuentros.</p>
+@endif
 
-  <div class="row"><span class="label">Ciudad último cumpleaños:</span>
-    {{ $perfil['CIUDAD_ULT_CUMPLE'] ?? '' }}, {{ $perfil['PROV_ULT_CUMPLE'] ?? '' }}, {{ $perfil['PAIS_ULT_CUMPLE'] ?? '' }}
-  </div>
+<p class="small" style="margin-top:12px;">
+  Total de encuentros: {{ count($encuentros) }}<br>
+  Última actualización: {{ \Carbon\Carbon::parse($perfil['ULTIMA_ACTUALIZACION'] ?? now())->format('d/m/Y H:i') }}
+</p>
 
-  <div class="row"><span class="label">Filtros:</span>
-    @php
-      $f = [
-        'Mellizos'   => $perfil['FILTRO_MELLIZOS'] ?? '',
-        'Adoptado'   => $perfil['FILTRO_ADOPTADO'] ?? '',
-        'Abusos'     => $perfil['FILTRO_ABUSOS'] ?? '',
-        'Suicidio'   => $perfil['FILTRO_SUICIDIO'] ?? '',
-        'Enfermedad' => $perfil['FILTRO_ENFERMEDAD'] ?? '',
-      ];
-      $marcados = collect($f)->filter(fn($v)=>trim((string)$v)!=='')->keys()->implode(' · ');
-    @endphp
-    {{ $marcados ?: '—' }}
-  </div>
+<div class="page-break"></div>
 
-  <div class="row"><span class="label">Signo subyacente:</span> {{ $perfil['SIGNO_SUBYACENTE'] ?? '' }}</div>
-  <div class="row"><span class="label">Balance energético:</span> {{ $perfil['BALANCE_ENERGETICO'] ?? '' }}</div>
-  <div class="row"><span class="label">Dispositores:</span> {{ $perfil['DISPOSITORES'] ?? '' }}</div>
-  <div class="row"><span class="label">Progresiones y Retornos:</span> {{ $perfil['PROGRESIONES_RETORNOS'] ?? '' }}</div>
-  <div class="row"><span class="label">Fase Lunación Natal:</span>
-    {{ $perfil['FASE_LUNACION_NATAL'] ?? '' }}
-    @if(!empty($perfil['PLANETA_ASOCIADO_LUNACION']))
-      <span class="muted"> (Planeta: {{ $perfil['PLANETA_ASOCIADO_LUNACION'] }})</span>
-    @endif
-  </div>
 
-  <div class="box">
-    <div class="mb8"><span class="key">¿Primera vez Astrología?</span> {{ $perfil['PRIMERA_VEZ_ASTROLOGIA'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Profesión/Ocupación:</span> {{ $perfil['PROFESION'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Vivo con:</span> {{ $perfil['VIVO_CON'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Hogar de la Infancia:</span> {{ $perfil['HOGAR_INFANCIA'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Enfermedades de la Infancia:</span> {{ $perfil['ENF_INFANCIA'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Síntomas actuales:</span> {{ $perfil['SINTOMAS_ACTUALES'] ?? '' }}</div>
-    <div class="mb8"><span class="key">Motivo de la Consulta:</span> {{ $perfil['MOTIVO_CONSULTA'] ?? '' }}</div>
-  </div>
+{{-- =================== PÁGINA 2 — DATOS PERSONALES =================== --}}
+<h2>Datos personales</h2>
+<div>
+  <div><span class="label">Fecha de Nacimiento:</span> <span class="value">{{ $perfil['FECHA_NAC'] ?? '—' }}</span></div>
+  <div><span class="label">Hora de Nacimiento:</span> <span class="value">{{ $perfil['HORA_NAC'] ?? '—' }}</span></div>
+  <div><span class="label">Lugar de Nacimiento:</span> <span class="value">{{ $perfil['CIUDAD_NAC'] ?? '' }} {{ $perfil['PROVINCIA_NAC'] ?? '' }} {{ $perfil['PAIS_NAC'] ?? '' }}</span></div>
+  <div><span class="label">Signo Solar:</span> <span class="value">{{ $perfil['SIGNO_SOLAR'] ?? '—' }}</span></div>
+  <div><span class="label">Fase de Lunación:</span> <span class="value">{{ $perfil['FASE_LUNACION_NATAL'] ?? '—' }} ({{ $perfil['PLANETA_ASOCIADO_LUNACION'] ?? '—' }})</span></div>
+  <div><span class="label">Contacto / Derivación:</span> <span class="value">{{ $perfil['CONTACTO'] ?? '—' }}</span></div>
+</div>
 
+<div class="section">
+  <h2>Lectura Astrológica Inicial</h2>
+  <p><strong>Signo Subyacente:</strong> {{ $perfil['SIGNO_SUBYACENTE'] ?? '—' }}</p>
+  <p><strong>Balance Energético:</strong> {{ $perfil['BALANCE_ENERGETICO'] ?? '—' }}</p>
+  <p><strong>Dispositores:</strong> {{ $perfil['DISPOSITORES'] ?? '—' }}</p>
+  <p><strong>Progresiones y Retornos:</strong> {{ $perfil['PROGRESIONES_RETORNOS'] ?? '—' }}</p>
+</div>
+
+<div class="section">
+  <h2>Motivo de Consulta</h2>
+  <p>{{ $perfil['MOTIVO_CONSULTA'] ?? '—' }}</p>
+</div>
+
+<div class="section">
   <h2>Observaciones</h2>
-  <div class="box">{!! nl2br(e($perfil['OBSERVACIONES'] ?? '')) !!}</div>
+  <p>{{ $perfil['OBSERVACIONES'] ?? '—' }}</p>
+</div>
 
-  <h2>Detalle del encuentro inicial</h2>
-  <div class="box">{!! nl2br(e($perfil['DETALLE_ENCUENTRO_INICIAL'] ?? '')) !!}</div>
+<div class="page-break"></div>
 
-  <h2>Resumen para Psicóloga</h2>
-  <div class="box">{!! nl2br(e($perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '')) !!}</div>
 
-  {{-- ================== PÁGINAS SIGUIENTES: 1 por encuentro ================== --}}
-  @php
-    // $encuentros: array de arrays con FECHA, CIUDAD_ULT_CUMPLE, TEMAS_TRATADOS, RESUMEN, EDAD_EN_ESE_ENCUENTRO
-    $total = is_countable($encuentros ?? []) ? count($encuentros) : 0;
-  @endphp
+{{-- =================== ENCUENTROS =================== --}}
+@php $n = 1; @endphp
+@foreach($encuentros as $e)
+  <h2>Encuentro {{ $n }}</h2>
+  <div><span class="label">Fecha:</span> <span class="value">{{ $e['FECHA'] ?? '—' }}</span></div>
+  <div><span class="label">Edad:</span> <span class="value">{{ is_numeric($e['EDAD_EN_ESE_ENCUENTRO'] ?? '') ? round($e['EDAD_EN_ESE_ENCUENTRO']) : ($e['EDAD_EN_ESE_ENCUENTRO'] ?? '—') }}</span></div>
+  <div><span class="label">Ciudad último cumpleaños:</span> <span class="value">{{ $e['CIUDAD_ULT_CUMPLE'] ?? '—' }}</span></div>
+  <div><span class="label">Temas tratados:</span> <span class="value">{{ $e['TEMAS_TRATADOS'] ?? '—' }}</span></div>
 
-  @if($total > 0)
-    @foreach($encuentros as $i => $e)
-      <div class="page-break"></div>
-      <h1>Encuentro {{ $i + 1 }}</h1>
-      <div class="row"><span class="label">Fecha:</span> {{ $e['FECHA'] ?? '' }}</div>
-      <div class="row"><span class="label">Edad en ese encuentro:</span> {{ $e['EDAD_EN_ESE_ENCUENTRO'] ?? '' }}</div>
-      <div class="row"><span class="label">Ciudad último cumpleaños:</span> {{ $e['CIUDAD_ULT_CUMPLE'] ?? '' }}</div>
-      <div class="row"><span class="label">Temas tratados:</span> {{ $e['TEMAS_TRATADOS'] ?? '' }}</div>
+  <h3>Resumen</h3>
+  <p style="white-space: pre-line;">{{ $e['RESUMEN'] ?? '—' }}</p>
 
-      <h2>Resumen</h2>
-      <div class="box">{!! nl2br(e($e['RESUMEN'] ?? '')) !!}</div>
-    @endforeach
-  @else
-    {{-- Sin encuentros cargados --}}
+  @if(!$loop->last)
+    <div class="page-break"></div>
   @endif
+  @php $n++; @endphp
+@endforeach
 
 </body>
 </html>

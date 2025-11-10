@@ -4,47 +4,34 @@ namespace App\Livewire\Pacientes;
 
 use Livewire\Component;
 use App\Services\SheetsService;
+use App\Repositories\PacienteRepository;
 use Carbon\Carbon;
 
 class Buscar extends Component
 {
-    /** Texto que escribe el usuario en el buscador de encuentro rápido */
     public string $q = '';
-
-    /** Sugerencias del buscador (nombre + id), filtradas localmente */
-    public array $sugs = [];
-
-    /** Lista para el panel “Lista de pacientes” (se muestra completa) */
     public array $items = [];
-
-    /** Cache local del índice completo para filtrar sin pegarle a Google */
     public array $todos = [];
+    public array $filtrosSeleccionados = [];
 
     public ?string $error = null;
 
-    // ====== Encuentro rápido ======
-    public ?string $selId = null;
-    public string $selNombre = '';
-    public array $enc = [
-        'FECHA' => '',
-        'CIUDAD_ULT_CUMPLE' => '',
-        'TEMAS_TRATADOS' => '',
-        'RESUMEN' => '',
-        'EDAD_EN_ESE_ENCUENTRO' => '',
+    public array $filtrosDisponibles = [
+        'FILTRO_MELLIZOS' => 'Mellizos',
+        'FILTRO_ADOPTADO' => 'Adoptado',
+        'FILTRO_ABUSOS' => 'Abusos',
+        'FILTRO_SUICIDIO' => 'Suicidio',
+        'FILTRO_ENFERMEDAD' => 'Enfermedad',
     ];
-    public string $msgEncuentro = '';
 
     public function mount(): void
     {
-        $this->cargarTodoYLista();
+        $this->cargarPacientes();
     }
 
-    private function cargarTodoYLista(): void
+    private function cargarPacientes(): void
     {
         $this->error = null;
-        $this->items = [];
-        $this->todos = [];
-        $this->sugs  = [];
 
         $ssid = (string) env('GOOGLE_SHEETS_INDEX_ID', '');
         if ($ssid === '') {
@@ -53,26 +40,37 @@ class Buscar extends Component
         }
 
         try {
-            $svc         = \App\Services\SheetsService::make();
-            $this->todos = $svc->readIndice($ssid); // [{nombre,id,ts}, ...]
+            $svc = SheetsService::make();
+            $this->todos = $svc->readIndice($ssid);
 
-            // Lista completa (enriquecimiento best-effort)
-            $base = array_map(fn($r) => [
-                'nombre' => $r['nombre'],
-                'id'     => $r['id'],
-                'ts'     => $r['ts'],
-                'signo'  => '',
-                'edad'   => '',
-            ], $this->todos);
+            // Enriquecer la lista (signo y edad)
+            $base = [];
+            foreach ($this->todos as $r) {
+                $fila = [
+                    'nombre' => $r['nombre'],
+                    'id'     => $r['id'],
+                    'ts'     => $r['ts'],
+                    'signo'  => '',
+                    'edad'   => '',
+                    'filtros' => [],
+                ];
 
-            foreach ($base as $i => $it) {
                 try {
-                    $perfil = $svc->getPerfil($it['id']);
-                    $base[$i]['signo'] = $perfil['SIGNO_SOLAR'] ?? '';
-                    $base[$i]['edad']  = $this->edadDesdeFn($perfil['FECHA_NAC'] ?? null);
+                    $perfil = $svc->getPerfil($r['id']);
+                    $fila['signo'] = $perfil['SIGNO_SOLAR'] ?? '';
+                    $fila['edad']  = $this->edadDesdeFn($perfil['FECHA_NAC'] ?? null);
+
+                    // guardar los filtros (marcados con "SI")
+                    foreach ($this->filtrosDisponibles as $campo => $label) {
+                        if (($perfil[$campo] ?? '') === 'SI') {
+                            $fila['filtros'][] = $campo;
+                        }
+                    }
                 } catch (\Throwable $e) {
-                    // ignoramos fallas por fila
+                    // ignorar fallas
                 }
+
+                $base[] = $fila;
             }
 
             $this->items = $base;
@@ -81,126 +79,56 @@ class Buscar extends Component
         }
     }
 
-    
-    /** Si querés mantener también el hook de Livewire, dejalo y delega: */
-    public function updatedQ($value): void
+    public function updatedQ(): void
     {
-        $this->buscar((string)$value);
+        $this->filtrarPacientes();
     }
 
-    /** Limpia todo: buscador, sugerencias y selección actual */
-    public function limpiarBusqueda(): void
+    public function updatedFiltrosSeleccionados(): void
     {
-        $this->q = '';
-        $this->sugs = [];
-        $this->selId = null;
-        $this->selNombre = '';
-        $this->msgEncuentro = '';
-        $this->enc = [
-            'FECHA' => '',
-            'CIUDAD_ULT_CUMPLE' => '',
-            'TEMAS_TRATADOS' => '',
-            'RESUMEN' => '',
-            'EDAD_EN_ESE_ENCUENTRO' => '',
-        ];
+        $this->filtrarPacientes();
     }
 
-
-    /** Listener explícito que filtra en memoria */
-    public function buscar(string $term = ''): void
+    private function filtrarPacientes(): void
     {
-        $this->q = $term;
+        $q = $this->normalize($this->q);
+        $filtros = $this->filtrosSeleccionados;
 
-        // si no hay texto, vaciamos sugerencias
-        $needle = $this->normalize($this->q);
-        if ($needle === '') {
-            $this->sugs = [];
-            return;
-        }
+        $this->items = array_values(array_filter($this->todos, function ($r) use ($q, $filtros) {
+            $nombre = $this->normalize($r['nombre'] ?? '');
+            $coincideNombre = ($q === '' || str_contains($nombre, $q));
 
-        // fallback: si por algún motivo $todos está vacío, recargamos índice 1 vez
-        if (empty($this->todos)) {
+            if (!$coincideNombre) return false;
+
+            if (empty($filtros)) return true;
+
             try {
-                $ssid = (string) env('GOOGLE_SHEETS_INDEX_ID', '');
-                if ($ssid !== '') {
-                    $this->todos = \App\Services\SheetsService::make()->readIndice($ssid);
+                $perfil = SheetsService::make()->getPerfil($r['id']);
+                foreach ($filtros as $f) {
+                    if (($perfil[$f] ?? '') === 'SI') {
+                        return true;
+                    }
                 }
+                return false;
             } catch (\Throwable $e) {
-                // si falla, seguimos con arreglo vacío (sin romper UI)
+                return false;
             }
-        }
-
-        // filtrar SOLO en $todos (no toca Google)
-        $norm = fn(string $s) => $this->normalize($s);
-        $filtrados = array_values(array_filter($this->todos, function (array $r) use ($needle, $norm) {
-            $hay = $norm((string)($r['nombre'] ?? ''));
-            return str_starts_with($hay, $needle);
         }));
-
-        // sugerencias mínimas
-        $this->sugs = array_map(fn($r) => [
-            'nombre' => $r['nombre'],
-            'id'     => $r['id'],
-        ], $filtrados);
     }
 
-    /** Click en una sugerencia → prepara el form de encuentro rápido */
-    public function seleccionarPaciente(string $id): void
+    public function crearPacienteVacio()
     {
-        $this->msgEncuentro = '';
-        $this->selId = $id;
-
-        // Buscar el nombre en el cache $todos
-        foreach ($this->todos as $r) {
-            if (($r['id'] ?? '') === $id) {
-                $this->selNombre = $r['nombre'] ?? '';
-                break;
-            }
-        }
-
-        $this->enc = [
-            'FECHA' => '',
-            'CIUDAD_ULT_CUMPLE' => '',
-            'TEMAS_TRATADOS' => '',
-            'RESUMEN' => '',
-            'EDAD_EN_ESE_ENCUENTRO' => '',
-        ];
-    }
-
-    /** Guarda el encuentro en la pestaña Encuentros del spreadsheet del paciente */
-    public function agregarEncuentroRapido(): void
-    {
-        $this->validate([
-            'enc.FECHA' => ['required','regex:/^\d{2}\/\d{2}\/\d{4}$/'],
-        ],[
-            'enc.FECHA.required' => 'La fecha es obligatoria.',
-            'enc.FECHA.regex'    => 'Formato de fecha inválido (DD/MM/AAAA).',
-        ]);
-
-        if (!$this->selId) {
-            $this->msgEncuentro = 'Primero elegí un paciente.';
-            return;
-        }
-
-        $svc = SheetsService::make();
-
-        // Edad en ese encuentro a partir de FECHA_NAC
         try {
-            $perfil = $svc->getPerfil($this->selId);
-            $fn = $perfil['FECHA_NAC'] ?? null;
-            $fe = $this->enc['FECHA'] ?? null;
-            $this->enc['EDAD_EN_ESE_ENCUENTRO'] = $this->edadDesdeFnEncuentro($fn, $fe);
+            $repo = PacienteRepository::make();
+            // Crear hoja con nombre temporal (se completará luego)
+            $id = $repo->crearDesdeTemplate('Paciente sin nombre');
+            return redirect()->route('paciente.editar', $id)
+                ->with('ok', 'Nuevo paciente creado ✔');
         } catch (\Throwable $e) {
-            $this->enc['EDAD_EN_ESE_ENCUENTRO'] = '';
+            $this->error = $e->getMessage();
         }
-
-        // Append
-        $svc->appendEncuentro($this->selId, $this->enc);
-
-        $this->msgEncuentro = 'Encuentro agregado ✔';
     }
 
-    /** Calcula edad (años) desde FECHA_NAC (DD/MM/AAAA) a hoy. */
     private function edadDesdeFn(?string $fn): string|int
     {
         try {
@@ -212,19 +140,6 @@ class Buscar extends Component
         }
     }
 
-    private function edadDesdeFnEncuentro(?string $fn, ?string $fe): string
-    {
-        try {
-            if (!$fn || !$fe) return '';
-            $nac = Carbon::createFromFormat('d/m/Y', trim($fn));
-            $ref = Carbon::createFromFormat('d/m/Y', trim($fe));
-            return (string) $nac->diffInYears($ref);
-        } catch (\Throwable $e) {
-            return '';
-        }
-    }
-
-    /** Normaliza: minúsculas, espacios, tildes. */
     private function normalize(string $s): string
     {
         $s = mb_strtolower(trim(preg_replace('/\s+/', ' ', $s)));
@@ -234,7 +149,7 @@ class Buscar extends Component
 
     public function render()
     {
-        return view('livewire.pacientes.buscar')
-            ->layout('components.layouts.app');
+        return view('livewire.pacientes.buscar')->layout('components.layouts.app');
     }
 }
+

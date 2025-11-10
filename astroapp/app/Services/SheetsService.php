@@ -271,13 +271,16 @@ class SheetsService
             ->getValues() ?? [];
 
         // Map a claves esperadas
-        return array_values(array_map(fn($r) => [
+        return array_values(array_filter(array_map(fn($r) => [
             'FECHA'                   => $r[0] ?? '',
             'CIUDAD_ULT_CUMPLE'       => $r[1] ?? '',
             'TEMAS_TRATADOS'          => $r[2] ?? '',
             'RESUMEN'                 => $r[3] ?? '',
             'EDAD_EN_ESE_ENCUENTRO'   => $r[4] ?? '',
-        ], $values));
+        ], $values), function ($row) {
+            // Filtramos filas vacías o que contengan nombres de campos en lugar de fechas
+            return !empty($row['FECHA']) && !preg_match('/^[A-Z_]+$/', trim($row['FECHA']));
+        }));
     }
 
 
@@ -295,4 +298,29 @@ class SheetsService
 
         return $sheet->spreadsheetId;
     }
+
+    /* ======================= UTILIDADES DE ADMIN ======================= */
+
+    public function clearRange(string $spreadsheetId, string $range): void
+    {
+        $clearBody = new \Google\Service\Sheets\ClearValuesRequest();
+        \App\Support\GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->clear($spreadsheetId, $range, $clearBody)
+        );
+    }
+
+    public function writeRange(string $spreadsheetId, string $range, array $values): void
+    {
+        $body = new \Google\Service\Sheets\ValueRange(['values' => $values]);
+        \App\Support\GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                $range,
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
+
+
 }

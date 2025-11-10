@@ -9,6 +9,10 @@
          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
         Editar
       </a>
+      <a href="{{ route('paciente.nuevo-encuentro', $id) }}"
+        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition">
+        + Agregar encuentro
+      </a>
       <a href="{{ route('buscar') }}" class="px-4 py-2 rounded-lg border border-gray-300 bg-white">Volver</a>
     </div>
   </header>

@@ -197,18 +197,30 @@ class DriveService
             $folderId
         );
 
-        $res = $this->drive->files->listFiles([
-            'q' => $q,
-            'fields' => 'files(id,name)',
-            'pageSize' => 1,
-        ]);
+        $res = \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->listFiles([
+                'q'        => $q,
+                'fields'   => 'files(id,name)',
+                'pageSize' => 1,
+            ])
+        );
 
         return (count($res->files) > 0) ? $res->files[0]->id : null;
     }
+
 
 
     public function getShareLink(string $fileId): string
     {
         return "https://drive.google.com/file/d/{$fileId}/view";
     }
+
+    public function deleteFileById(string $fileId): void
+    {
+        \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->delete($fileId)
+        );
+    }
+
+
 }

@@ -151,6 +151,10 @@ class Editar extends Component
         // PDF (si ya lo tenías armado, acá iría regeneración + subida)
         $this->mensaje = 'Perfil guardado correctamente ✔';
 
+        // Redirigir a la vista de "ver paciente"
+        return redirect()->route('paciente.ver', ['id' => $this->id]);
+
+
         $this->dispatch('guardado-ok');         // toast si querés
         $this->dispatch('scroll-top');          // scrollear arriba
         $this->dispatch('ui-loading', false);   // apagar loader
