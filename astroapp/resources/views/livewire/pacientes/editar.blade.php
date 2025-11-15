@@ -219,24 +219,107 @@
   </section>
 
   {{-- 11) FASE DE LUNACIÓN + planeta asociado --}}
-  <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
-    <h2 class="font-semibold text-lg">Fase de Lunación Natal</h2>
-    <div class="grid md:grid-cols-3 gap-4">
-      <div class="md:col-span-2">
-        <select wire:model="perfil.FASE_LUNACION_NATAL"
-                class="w-full border border-gray-300 rounded-lg p-2.5">
-          <option value="">Seleccionar…</option>
-          @foreach($fasesLunacion as $fase => $planeta)
-            <option value="{{ $fase }}">{{ $fase }}</option>
-          @endforeach
-        </select>
+  <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-6">
+
+      {{-- BLOQUE: DATOS PARA CALCULAR FASE --}}
+      <div class="space-y-4">
+          <h2 class="font-semibold text-lg">Fase de Lunación Natal</h2>
+
+          <div class="grid md:grid-cols-4 gap-4">
+
+              <div>
+                  <label class="block text-sm text-gray-700">Signo del Sol</label>
+                  <input type="text" wire:model.lazy="perfil.SIGNO_SOL"
+                        placeholder="Ej: Aries"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Grado del Sol</label>
+                  <input type="number" min="0" max="29" wire:model.lazy="perfil.GRADO_SOL"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Signo de la Luna</label>
+                  <input type="text" wire:model.lazy="perfil.SIGNO_LUNA"
+                        placeholder="Ej: Cáncer"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Grado de la Luna</label>
+                  <input type="number" min="0" max="29" wire:model.lazy="perfil.GRADO_LUNA"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+          </div>
+
+          <div class="pt-4 border-t space-y-3">
+              <div>
+                  <label class="block text-sm text-gray-700">Fase calculada</label>
+                  <input type="text" class="w-full bg-gray-100 p-2.5 rounded-lg"
+                        value="{{ $perfil['FASE_LUNACION_NATAL'] ?? '' }}" readonly>
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Planeta asociado</label>
+                  <input type="text" class="w-full bg-gray-100 p-2.5 rounded-lg"
+                        value="{{ $perfil['PLANETA_ASOCIADO_LUNACION'] ?? '' }}" readonly>
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Signo asociado</label>
+                  <input type="text" class="w-full bg-gray-100 p-2.5 rounded-lg"
+                        value="{{ $perfil['SIGNO_ASOCIADO_LUNACION'] ?? '' }}" readonly>
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Texto asociado</label>
+                  <input type="text" class="w-full bg-gray-100 p-2.5 rounded-lg"
+                        value="{{ $perfil['TEXTO_FASE_LUNACION'] ?? '' }}" readonly>
+              </div>
+
+              @if(!empty($perfil['IMAGEN_FASE_LUNACION']))
+                  <img src="{{ asset('images/fases/' . $perfil['IMAGEN_FASE_LUNACION']) }}"
+                      class="h-40 rounded-lg border object-cover">
+              @endif
+          </div>
       </div>
-      <div>
-        <input type="text" class="w-full border rounded-lg p-2.5 bg-gray-100"
-               value="{{ $perfil['PLANETA_ASOCIADO_LUNACION'] ?? '' }}" readonly
-               placeholder="Planeta asociado">
+
+
+      {{-- BLOQUE INFERIOR: GRADO SABIANO --}}
+      <div class="pt-6 border-t space-y-4">
+          <h2 class="font-semibold text-lg">Grado Sabiano</h2>
+
+          <div class="grid md:grid-cols-3 gap-4">
+              <div>
+                  <label class="block text-sm text-gray-700">Signo</label>
+                  <input type="text" wire:model.lazy="perfil.SIGNO_SABIANO"
+                        placeholder="Aries"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Grado (1 a 30)</label>
+                  <input type="number" min="1" max="30"
+                        wire:model.lazy="perfil.GRADO_SABIANO"
+                        class="w-full border rounded-lg p-2.5">
+              </div>
+
+              <div>
+                  <label class="block text-sm text-gray-700">Título</label>
+                  <input type="text" class="w-full bg-gray-100 rounded-lg p-2.5"
+                        value="{{ $perfil['TITULO_SABIANO'] ?? '' }}" readonly>
+              </div>
+          </div>
+
+          @if(!empty($perfil['IMAGEN_SABIANO']))
+              <img src="{{ asset($perfil['IMAGEN_SABIANO']) }}"
+                  class="h-48 rounded-lg border object-cover">
+          @endif
       </div>
-    </div>
+
   </section>
 
   {{-- 12) ENCUENTRO (preguntas) --}}

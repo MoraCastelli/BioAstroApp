@@ -9,6 +9,7 @@ use Livewire\WithFileUploads;
 use App\Services\SheetsService;
 use App\Services\DriveService;
 use Carbon\Carbon;
+use App\Services\SabianoService;
 
 class Editar extends Component
 {
@@ -17,8 +18,6 @@ class Editar extends Component
     public string $id;
     public array $perfil = [];
     public string $mensaje = '';
-
-    // Upload local temporal (drag & drop o selector)
     public $fotoUpload;
 
     public array $nuevoEncuentro = [
@@ -27,17 +26,6 @@ class Editar extends Component
         'TEMAS_TRATADOS' => '',
         'RESUMEN' => '',
         'EDAD_EN_ESE_ENCUENTRO' => '',
-    ];
-
-    public array $fasesLunacion = [
-        'Luna Nueva' => 'Sol',
-        'Creciente Iluminante' => 'Marte',
-        'Cuarto Creciente' => 'Marte',
-        'Gibosa Creciente' => 'Júpiter',
-        'Luna Llena' => 'Luna',
-        'Gibosa Menguante' => 'Saturno',
-        'Cuarto Menguante' => 'Saturno',
-        'Creciente Menguante (Balsámica)' => 'Neptuno',
     ];
 
     protected array $rules = [
@@ -50,20 +38,18 @@ class Editar extends Component
         'perfil.PAIS_NAC' => 'nullable|string|max:80',
         'perfil.FECHA_ENCUENTRO_INICIAL' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
         'perfil.HORA_ENCUENTRO_INICIAL'  => 'nullable|string|max:10',
-        'perfil.SIGNO_SOLAR' => 'nullable|string|max:30',
-        'perfil.FASE_LUNACION_NATAL' => 'nullable|string',
         'perfil.RESUMEN_PARA_PSICOLOGA_URL_AUDIO' => 'nullable|url',
 
-        // Upload imagen (drag & drop)
-        'fotoUpload' => 'nullable|image|max:5120', // 5MB
+        'fotoUpload' => 'nullable|image|max:5120',
         'nuevoEncuentro.FECHA' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
     ];
 
     public function mount($id)
     {
         $this->id = $id;
-        $this->perfil = SheetsService::make()->getPerfil($id);
+        $perfil = SheetsService::make()->getPerfil($id);
 
+        // Claves EXACTAS según SheetsService::setPerfil()
         $defaults = [
             'NOMBRE_Y_APELLIDO' => '',
             'FOTO_URL' => '',
@@ -83,16 +69,35 @@ class Editar extends Component
             'FILTRO_ABUSOS' => '',
             'FILTRO_SUICIDIO' => '',
             'FILTRO_ENFERMEDAD' => '',
-            'SIGNO_SOLAR' => '',
+
+            'SIGNO_SOL' => '',
+            'GRADO_SOL' => '',
+            'SIGNO_LUNA' => '',
+            'GRADO_LUNA' => '',
+
+            'SIGNO_SOLAR' => '', // aunque no lo uses lo mantenemos porque existe en Sheets
+
             'FECHA_ENCUENTRO_INICIAL' => '',
             'HORA_ENCUENTRO_INICIAL' => '',
             'EDAD_EN_ENCUENTRO_INICIAL' => '',
+
             'SIGNO_SUBYACENTE' => '',
             'BALANCE_ENERGETICO' => '',
             'DISPOSITORES' => '',
             'PROGRESIONES_RETORNOS' => '',
+
             'FASE_LUNACION_NATAL' => '',
             'PLANETA_ASOCIADO_LUNACION' => '',
+            'SIGNO_ASOCIADO_LUNACION' => '',
+            'IMAGEN_FASE_LUNACION' => '',
+            'TEXTO_FASE_LUNACION' => '',
+
+            'SIGNO_SABIANO' => '',
+            'GRADO_SABIANO' => '',
+            'TITULO_SABIANO' => '',
+            'IMAGEN_SABIANO' => '',
+            'TEXTO_SABIANO' => '',
+
             'PRIMERA_VEZ_ASTROLOGIA' => '',
             'PROFESION' => '',
             'VIVO_CON' => '',
@@ -101,15 +106,18 @@ class Editar extends Component
             'SINTOMAS_ACTUALES' => '',
             'MOTIVO_CONSULTA' => '',
             'DETALLE_ENCUENTRO_INICIAL' => '',
+
             'RESUMEN_PARA_PSICOLOGA_URL_AUDIO' => '',
             'RESUMEN_PARA_PSICOLOGA_TEXTO' => '',
             'ULTIMA_ACTUALIZACION' => '',
         ];
-        $this->perfil = array_merge($defaults, $this->perfil);
+
+        $this->perfil = array_merge($defaults, $perfil);
     }
 
     public function updatedPerfil($value, $key)
     {
+        // EDAD
         if (in_array($key, ['FECHA_NAC', 'FECHA_ENCUENTRO_INICIAL'])) {
             $this->perfil['EDAD_EN_ENCUENTRO_INICIAL'] = $this->calcularEdad(
                 $this->perfil['FECHA_NAC'] ?? null,
@@ -117,19 +125,50 @@ class Editar extends Component
             );
         }
 
-        if ($key === 'FASE_LUNACION_NATAL') {
-            $fase = $this->perfil['FASE_LUNACION_NATAL'] ?? '';
-            $this->perfil['PLANETA_ASOCIADO_LUNACION'] = $this->fasesLunacion[$fase] ?? '';
+        // SABIANO
+        if (in_array($key, ['SIGNO_SABIANO', 'GRADO_SABIANO'])) {
+            $signo = $this->perfil['SIGNO_SABIANO'];
+            $grado = intval($this->perfil['GRADO_SABIANO']);
+
+            if ($signo && $grado) {
+                $sab = SabianoService::get($signo, $grado);
+                if ($sab) {
+                    $this->perfil['TITULO_SABIANO'] = $sab['titulo'] ?? '';
+                    $this->perfil['IMAGEN_SABIANO'] = $sab['imagen'] ?? '';
+                    $this->perfil['TEXTO_SABIANO'] = $sab['texto'] ?? '';
+                }
+            }
+        }
+
+        // LUNACIÓN
+        if (in_array($key, ['SIGNO_SOL','GRADO_SOL','SIGNO_LUNA','GRADO_LUNA'])) {
+
+            $solSigno  = $this->perfil['SIGNO_SOL'];
+            $solGrado  = intval($this->perfil['GRADO_SOL']);
+            $lunaSigno = $this->perfil['SIGNO_LUNA'];
+            $lunaGrado = intval($this->perfil['GRADO_LUNA']);
+
+            if ($solSigno && $solGrado && $lunaSigno && $lunaGrado) {
+
+                $fase = $this->calcularFaseLunacionInterno($solSigno, $solGrado, $lunaSigno, $lunaGrado);
+
+                if ($fase) {
+                    $this->perfil['FASE_LUNACION_NATAL']       = $fase['nombre'];
+                    $this->perfil['PLANETA_ASOCIADO_LUNACION'] = $fase['planeta'];
+                    $this->perfil['SIGNO_ASOCIADO_LUNACION']   = $fase['signo'];
+                    $this->perfil['IMAGEN_FASE_LUNACION']      = $fase['imagen'];
+                    $this->perfil['TEXTO_FASE_LUNACION']       = $fase['texto'];
+                }
+            }
         }
     }
 
-    private function calcularEdad(?string $fechaNac, ?string $fechaRef): string
+    private function calcularEdad(?string $nac, ?string $ref): string
     {
         try {
-            if (!$fechaNac || !$fechaRef) return '';
-            $nac = Carbon::createFromFormat('d/m/Y', $fechaNac);
-            $ref = Carbon::createFromFormat('d/m/Y', $fechaRef);
-            return (string) $nac->diffInYears($ref);
+            if (!$nac || !$ref) return '';
+            return Carbon::createFromFormat('d/m/Y', $nac)
+                ->diffInYears(Carbon::createFromFormat('d/m/Y', $ref));
         } catch (\Throwable $e) {
             return '';
         }
@@ -137,103 +176,60 @@ class Editar extends Component
 
     public function guardar()
     {
-        $this->dispatch('ui-loading', true);
         $this->validate();
-
-        $this->perfil['EDAD_EN_ENCUENTRO_INICIAL'] = $this->calcularEdad(
-            $this->perfil['FECHA_NAC'] ?? null,
-            $this->perfil['FECHA_ENCUENTRO_INICIAL'] ?? null
-        );
         $this->perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
 
         SheetsService::make()->setPerfil($this->id, $this->perfil);
 
-        // PDF (si ya lo tenías armado, acá iría regeneración + subida)
-        $this->mensaje = 'Perfil guardado correctamente ✔';
-
-        // Redirigir a la vista de "ver paciente"
         return redirect()->route('paciente.ver', ['id' => $this->id]);
-
-
-        $this->dispatch('guardado-ok');         // toast si querés
-        $this->dispatch('scroll-top');          // scrollear arriba
-        $this->dispatch('ui-loading', false);   // apagar loader
     }
 
-    public function subirFoto()
+    private function zodiacToDegrees(string $signo, int $grado): ?float
     {
-        // 1) Validar que haya archivo
-        $this->validateOnly('fotoUpload'); // 'image|max:5120' ya lo tenías
-        if (!$this->fotoUpload) {
-            $this->mensaje = 'No hay archivo para subir.';
-            return;
-        }
-
-        // 2) Guardar el tmp local de forma segura
-        //    (livewire-tmp a veces se limpia; movelo a 'tmp' con nombre único)
-        $ext = strtolower($this->fotoUpload->getClientOriginalExtension() ?: 'jpg');
-        $tmpRelPath = $this->fotoUpload->storeAs('tmp', Str::uuid().'.'.$ext, 'local');
-        $abs = Storage::disk('local')->path($tmpRelPath);
-
-        if (!is_file($abs)) {
-            $this->mensaje = 'No se pudo guardar el archivo temporal.';
-            return;
-        }
-
-        // 3) Preparar nombre en Drive
-        $nombreBase = trim($this->perfil['NOMBRE_Y_APELLIDO'] ?: 'Paciente');
-        $nombre = $nombreBase.' - '.date('Ymd-His').'.'.$ext;
-
-        // 4) Asegurar carpeta y subir
-        $drive = \App\Services\DriveService::make();
-        $folderId = $drive->ensureFolderByName('Cartas Astrales'); // crea si no existe
-
-        try {
-            $fileId = $drive->uploadImageToFolder($abs, $nombre, $folderId);
-            $drive->makeAnyoneReader($fileId);
-
-            // probá primero con el thumbnail (suele cargar siempre) o la vista
-            //$publicUrl = $drive->getPublicContentUrl($fileId);
-            $publicUrl = $drive->getThumbnailUrl($fileId, 1000); // si preferís
-
-            $this->perfil['FOTO_URL'] = $publicUrl;
-            $this->mensaje = 'Imagen subida ✔';
-        } finally {
-            // 5) Limpiar el tmp local pase lo que pase
-            @Storage::disk('local')->delete($tmpRelPath);
-        }
-
-        // 6) Limpiar el input para que puedas subir otra
-        $this->fotoUpload = null;
-    }
-
-
-    public function agregarEncuentro()
-    {
-        $this->dispatch('ui-loading', true);
-
-        $this->validateOnly('nuevoEncuentro.FECHA');
-        $fn = $this->perfil['FECHA_NAC'] ?? null;
-        $fe = $this->nuevoEncuentro['FECHA'] ?? null;
-        $this->nuevoEncuentro['EDAD_EN_ESE_ENCUENTRO'] = $this->calcularEdad($fn, $fe);
-
-        SheetsService::make()->appendEncuentro($this->id, $this->nuevoEncuentro);
-
-        $this->nuevoEncuentro = [
-            'FECHA' => '',
-            'CIUDAD_ULT_CUMPLE' => '',
-            'TEMAS_TRATADOS' => '',
-            'RESUMEN' => '',
-            'EDAD_EN_ESE_ENCUENTRO' => '',
+        $signo = strtolower(trim($signo));
+        $offsets = [
+            'aries' => 0,
+            'tauro' => 30,
+            'geminis' => 60, 'géminis' => 60,
+            'cancer' => 90, 'cáncer' => 90,
+            'leo' => 120,
+            'virgo' => 150,
+            'libra' => 180,
+            'escorpio' => 210,
+            'sagitario' => 240,
+            'capricornio' => 270,
+            'acuario' => 300,
+            'piscis' => 330,
         ];
+        return $offsets[$signo] ?? null
+            ? $offsets[$signo] + $grado
+            : null;
+    }
 
-        $this->mensaje = 'Encuentro agregado ✔';
-        $this->dispatch('encuentro-ok');
-        $this->dispatch('ui-loading', false);
+    private function calcularFaseLunacionInterno(string $signoSol, int $gradoSol, string $signoLuna, int $gradoLuna): ?array
+    {
+        $sol  = $this->zodiacToDegrees($signoSol, $gradoSol);
+        $luna = $this->zodiacToDegrees($signoLuna, $gradoLuna);
+
+        if ($sol === null || $luna === null) return null;
+
+        $angulo = fmod(($luna - $sol + 360), 360);
+        $fases  = config('fases_lunacion');
+
+        if ($angulo < 45)  return ['nombre'=>'Luna Nueva'] + $fases['Luna Nueva'];
+        if ($angulo < 90)  return ['nombre'=>'Luna Creciente'] + $fases['Luna Creciente'];
+        if ($angulo <135)  return ['nombre'=>'Luna Cuarto Creciente'] + $fases['Luna Cuarto Creciente'];
+        if ($angulo <180)  return ['nombre'=>'Luna Gibosa'] + $fases['Luna Gibosa'];
+        if ($angulo <225)  return ['nombre'=>'Luna Llena'] + $fases['Luna Llena'];
+        if ($angulo <270)  return ['nombre'=>'Luna Menguante'] + $fases['Luna Menguante'];
+        if ($angulo <315)  return ['nombre'=>'Luna Cuarto Menguante'] + $fases['Luna Cuarto Menguante'];
+
+        return ['nombre'=>'Luna Balsamica'] + $fases['Luna Balsamica'];
     }
 
     public function render()
     {
-        return view('livewire.pacientes.editar')->layout('components.layouts.app');
+        return view('livewire.pacientes.editar')
+            ->layout('components.layouts.app');
     }
 }

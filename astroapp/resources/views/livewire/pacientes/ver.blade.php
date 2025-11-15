@@ -60,12 +60,43 @@
     </div>
   </section>
 
-  {{-- FASE LUNACIÓN --}}
-  <section class="bg-white p-5 rounded-xl shadow border border-gray-100">
+{{-- FASE LUNACIÓN --}}
+<section class="bg-white p-5 rounded-xl shadow border border-gray-100">
     <h2 class="font-semibold text-lg mb-2">Fase de Lunación Natal</h2>
+
     <p><strong>Fase:</strong> {{ $perfil['FASE_LUNACION_NATAL'] ?? '—' }}</p>
-    <p><strong>Planeta Asociado:</strong> {{ $perfil['PLANETA_ASOCIADO_LUNACION'] ?? '—' }}</p>
+    <p><strong>Planeta:</strong> {{ $perfil['PLANETA_ASOCIADO_LUNACION'] ?? '—' }}</p>
+    <p><strong>Signo:</strong> {{ $perfil['SIGNO_ASOCIADO_LUNACION'] ?? '—' }}</p>
+
+    <div class="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed">
+        {!! nl2br(e($perfil['TEXTO_FASE_LUNACION'] ?? '—')) !!}
+    </div>
+
+    @if(!empty($perfil['IMAGEN_FASE_LUNACION']))
+        <img src="{{ asset('images/fases/' . $perfil['IMAGEN_FASE_LUNACION']) }}"
+             class="h-48 my-3 rounded-lg border object-cover">
+    @endif
+</section>
+
+
+
+
+  <section class="bg-white p-5 rounded-xl shadow border border-gray-100">
+    <h2 class="font-semibold text-lg mb-2">Grado Sabiano</h2>
+    <p><strong>Signo:</strong> {{ $perfil['SIGNO_SABIANO'] ?? '—' }}</p>
+    <p><strong>Grado:</strong> {{ $perfil['GRADO_SABIANO'] ?? '—' }}</p>
+    <p><strong>Título:</strong> {{ $perfil['TITULO_SABIANO'] ?? '—' }}</p>
+    <p><strong>Descripción:</strong> {{ $perfil['TEXTO_SABIANO'] ?? '—' }}</p>
+
+
+    @if(!empty($perfil['IMAGEN_SABIANO']))
+      <div class="mt-3">
+        <img src="{{ asset($perfil['IMAGEN_SABIANO']) }}"
+            class="h-56 rounded-lg border object-cover">
+      </div>
+    @endif
   </section>
+
 
   {{-- DETALLE Y RESUMEN --}}
   <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-3">
