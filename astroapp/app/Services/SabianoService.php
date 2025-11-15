@@ -12,18 +12,17 @@ class SabianoService
     {
         if (!empty(self::$cache)) return self::$cache;
 
-        $path = base_path('data/sabianos.json');
+        $path = storage_path('app/sabianos/sabianos.json');
 
         if (!file_exists($path)) {
-            return [];
+            return self::$cache = [];  // garantizar que siempre sea array
         }
 
         $json = json_decode(file_get_contents($path), true);
 
-        if (!is_array($json)) return [];
+        if (!is_array($json)) return self::$cache = [];
 
         self::$cache = $json;
-
         return self::$cache;
     }
 
@@ -47,6 +46,14 @@ class SabianoService
 
         if (!isset($data[$signo][$grado])) return null;
 
-        return $data[$signo][$grado];
+        $row = $data[$signo][$grado];
+
+        // Normalizar ruta
+        if (!empty($row['imagen'])) {
+            $row['imagen'] = str_replace('public/', '', $row['imagen']);
+        }
+
+        return $row;
     }
+
 }

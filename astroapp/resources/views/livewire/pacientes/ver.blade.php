@@ -78,16 +78,14 @@
     @endif
 </section>
 
-
-
-
   <section class="bg-white p-5 rounded-xl shadow border border-gray-100">
     <h2 class="font-semibold text-lg mb-2">Grado Sabiano</h2>
     <p><strong>Signo:</strong> {{ $perfil['SIGNO_SABIANO'] ?? '—' }}</p>
     <p><strong>Grado:</strong> {{ $perfil['GRADO_SABIANO'] ?? '—' }}</p>
     <p><strong>Título:</strong> {{ $perfil['TITULO_SABIANO'] ?? '—' }}</p>
-    <p><strong>Descripción:</strong> {{ $perfil['TEXTO_SABIANO'] ?? '—' }}</p>
-
+    <div class="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed">
+      {!! nl2br(e($perfil['TEXTO_SABIANO'] ?? '—')) !!}
+    </div>
 
     @if(!empty($perfil['IMAGEN_SABIANO']))
       <div class="mt-3">
