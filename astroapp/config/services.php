@@ -36,11 +36,12 @@ return [
     ],
 
     'google' => [
-    'credentials'   => env('GOOGLE_APP_CREDENTIALS'),
-    'db_folder_id'  => env('GOOGLE_DRIVE_DB_FOLDER_ID'),
-    'files_folder_id' => env('GOOGLE_DRIVE_FILES_FOLDER_ID'),
-    'template_id'   => env('GOOGLE_SHEETS_TEMPLATE_ID'),
-    'index_id'      => env('GOOGLE_SHEETS_INDEX_ID'),
+        'credentials'   => env('GOOGLE_APP_CREDENTIALS'),
+        'db_folder_id'  => env('GOOGLE_DRIVE_DB_FOLDER_ID'),
+        'files_folder_id' => env('GOOGLE_DRIVE_FILES_FOLDER_ID'),
+        'template_paciente_spreadsheet_id'   => env('GOOGLE_SHEETS_TEMPLATE_ID'),
+        'index_id'      => env('GOOGLE_SHEETS_INDEX_ID'),
+        'pacientes_folder_id' => env('GOOGLE_DRIVE_PACIENTES_FOLDER_ID'),
 ],
 
 

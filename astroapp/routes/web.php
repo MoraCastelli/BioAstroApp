@@ -18,9 +18,25 @@ Route::get('/', function () {
 Route::get('/google/auth', [GoogleAuthController::class, 'redirect'])->name('google.auth');
 Route::get('/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
 Route::post('/google/logout', [GoogleAuthController::class, 'logout'])->name('google.logout');
+Route::get('/google/logout', [GoogleAuthController::class, 'logout'])->name('google.logout.get');
 
 // Rutas que usan Drive/Sheets (requieren estar logueado con Google)
 Route::middleware([\App\Http\Middleware\EnsureGoogleConnected::class])->group(function () {
+    Route::get('/debug-google', function () {
+        $drive = \App\Services\DriveService::make();
+
+        $templateId = config('services.google.template_paciente_spreadsheet_id');
+        $dbFolderId = config('services.google.db_folder_id');
+
+        return dd([
+            'whoAmI' => $drive->whoAmI(),
+            'templateId' => $templateId,
+            'templateName' => $drive->getFileName($templateId),
+            'db_folder_id' => $dbFolderId,
+            'db_folder_name' => $drive->getFileName($dbFolderId), // 👈 si esto falla, era la carpeta
+        ]);
+    });
+
     Route::get('/pacientes/{id}/ver', Ver::class)->name('paciente.ver');
     Route::get('/pacientes/{id}/nuevo-encuentro', NuevoEncuentro::class)->name('paciente.nuevo-encuentro');
     Route::get('/pacientes/{id}/eliminar', Eliminar::class)->name('paciente.eliminar');

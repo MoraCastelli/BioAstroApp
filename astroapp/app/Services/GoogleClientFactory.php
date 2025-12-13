@@ -13,7 +13,7 @@ class GoogleClientFactory
 
         // Scopes correctos (usar las clases de Google, no las tuyas)
         $client->setScopes([
-            \Google\Service\Drive::DRIVE_FILE,
+            \Google\Service\Drive::DRIVE,
             \Google\Service\Sheets::SPREADSHEETS,
         ]);
 

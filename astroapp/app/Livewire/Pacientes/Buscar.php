@@ -41,43 +41,67 @@ class Buscar extends Component
 
         try {
             $svc = SheetsService::make();
-            $this->todos = $svc->readIndice($ssid);
 
-            // Enriquecer la lista (signo y edad)
-            $base = [];
-            foreach ($this->todos as $r) {
+            $indice = array_values(array_filter(
+                $svc->readIndice($ssid),
+                fn ($r) => !empty(trim((string)($r['id'] ?? '')))
+            ));
+
+            $uniq = []; // clave = spreadsheetId
+
+            foreach ($indice as $r) {
+                $id = trim((string)$r['id']);
+                if ($id === '') {
+                    continue;
+                }
+
+                // Si ya procesamos este ID, lo salteamos (evita duplicados)
+                if (isset($uniq[$id])) {
+                    continue;
+                }
+
                 $fila = [
-                    'nombre' => $r['nombre'],
-                    'id'     => $r['id'],
-                    'ts'     => $r['ts'],
-                    'signo'  => '',
-                    'edad'   => '',
+                    'nombre'  => $r['nombre'] ?? 'Paciente',
+                    'id'      => $id,
+                    'ts'      => $r['ts'] ?? '',
+                    'signo'   => '',
+                    'edad'    => '',
                     'filtros' => [],
                 ];
 
                 try {
-                    $perfil = $svc->getPerfil($r['id']);
+                    $perfil = $svc->getPerfil($id);
+
                     $fila['signo'] = $perfil['SIGNO_SOLAR'] ?? '';
                     $fila['edad']  = $this->edadDesdeFn($perfil['FECHA_NAC'] ?? null);
 
-                    // guardar los filtros (marcados con "SI")
+                    // Filtros marcados como "SI"
                     foreach ($this->filtrosDisponibles as $campo => $label) {
                         if (($perfil[$campo] ?? '') === 'SI') {
                             $fila['filtros'][] = $campo;
                         }
                     }
+
+                    // Si en el perfil ya tiene nombre real, pisa al del índice
+                    if (!empty($perfil['NOMBRE_Y_APELLIDO'])) {
+                        $fila['nombre'] = $perfil['NOMBRE_Y_APELLIDO'];
+                    }
                 } catch (\Throwable $e) {
-                    // ignorar fallas
+                    // ignoramos errores de perfiles individuales
                 }
 
-                $base[] = $fila;
+                // Guardamos deduplicado
+                $uniq[$id] = $fila;
             }
 
-            $this->items = $base;
+            $this->todos = array_values($uniq);
+            $this->items = $this->todos;
+
         } catch (\Throwable $e) {
             $this->error = $e->getMessage();
         }
     }
+
 
     public function updatedQ(): void
     {
@@ -95,26 +119,21 @@ class Buscar extends Component
         $filtros = $this->filtrosSeleccionados;
 
         $this->items = array_values(array_filter($this->todos, function ($r) use ($q, $filtros) {
+            // Seguridad: si no hay id, no lo mostramos
+            if (empty($r['id'])) return false;
+
             $nombre = $this->normalize($r['nombre'] ?? '');
             $coincideNombre = ($q === '' || str_contains($nombre, $q));
-
             if (!$coincideNombre) return false;
 
             if (empty($filtros)) return true;
 
-            try {
-                $perfil = SheetsService::make()->getPerfil($r['id']);
-                foreach ($filtros as $f) {
-                    if (($perfil[$f] ?? '') === 'SI') {
-                        return true;
-                    }
-                }
-                return false;
-            } catch (\Throwable $e) {
-                return false;
-            }
+            // Como ya guardamos filtros en $r['filtros'], filtramos sin ir a Sheets
+            $tiene = $r['filtros'] ?? [];
+            return count(array_intersect($filtros, $tiene)) > 0;
         }));
     }
+
 
     public function crearPacienteVacio()
     {

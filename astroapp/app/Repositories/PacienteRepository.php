@@ -28,38 +28,56 @@ class PacienteRepository
         $drive  = $this->drive;
         $sheets = $this->sheets;
 
-        $folderId = (string) config('services.google.db_folder_id');
-        if ($folderId === '') {
+        $rootPacientes = (string) config('services.google.db_folder_id'); // si querés renombrarlo a pacientes_folder_id mejor
+        if ($rootPacientes === '') {
             throw new \RuntimeException('Falta services.google.db_folder_id');
         }
 
-        $fileName = $this->fileName($nombreApellido);
-
-        // Idempotencia: si ya existe un archivo con ese nombre en la carpeta, reusarlo.
-        if (method_exists($drive, 'findByNameInFolder')) {
-            $existente = $drive->findByNameInFolder($folderId, $fileName);
-        } else {
-            // fallback simple si no tenés ese método implementado
-            $existente = null;
+        $templateId = (string) config('services.google.template_paciente_spreadsheet_id');
+        if ($templateId === '') {
+            throw new \RuntimeException('Falta services.google.template_paciente_spreadsheet_id');
         }
 
-        $spreadsheetId = $existente ?: $drive->createSpreadsheetInFolder($fileName, $folderId);
+        $nombre = $this->fileName($nombreApellido);
 
-        // Estructura Sheets
+        // 1) carpeta del paciente (dentro del root)
+        $folderPaciente = $drive->ensureFolderByName($nombre, $rootPacientes);
+
+        // 2) subcarpeta Imagenes
+        $folderImgs = $drive->ensureFolderByName('Imagenes', $folderPaciente);
+
+        // 3) Libro (Spreadsheet) dentro de la carpeta del paciente:
+        //    idempotencia: si existe uno con ese nombre, reusarlo
+        $spreadsheetId = $drive->findByNameInFolder($folderPaciente, $nombre);
+        if (!$spreadsheetId) {
+            $spreadsheetId = $drive->copyFileToFolder($templateId, $nombre, $folderPaciente);
+        }
+
+        // 4) Asegurar estructura (por si cambió template)
         $sheets->seedPerfil($spreadsheetId);
         $sheets->ensureEncuentrosSheet($spreadsheetId);
+        // si tenés ensureImagenesSheet, llamalo (o appendImagen ya lo hace)
 
-        // Valores iniciales
+        // 5) Valores iniciales
         $this->guardarPerfil($spreadsheetId, [
             'NOMBRE_Y_APELLIDO'    => $nombreApellido,
             'ULTIMA_ACTUALIZACION' => Carbon::now()->toIso8601String(),
         ]);
 
-        // PDF inicial (portada + (cero) encuentros)
-        //$this->regenerarPdf($spreadsheetId);
+        // 6) Índice: ideal guardar folder IDs también
+        $indiceId = (string) config('services.google.index_id');
+        if ($indiceId) {
+            $sheets->upsertIndice($indiceId, [
+                $nombreApellido,
+                $spreadsheetId,
+                Carbon::now()->toIso8601String(),
+            ]);
+
+        }
 
         return $spreadsheetId;
     }
+
 
     public function eliminarPaciente(string $spreadsheetId, ?string $nombreUi = null): void
     {

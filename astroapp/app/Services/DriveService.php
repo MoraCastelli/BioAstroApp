@@ -15,6 +15,24 @@ class DriveService
         $client = GoogleClientFactory::make();
         return new self(new Drive($client));
     }
+    public function whoAmI(): array
+{
+    $about = \App\Support\GoogleRetry::call(fn() =>
+        $this->drive->about->get(['fields' => 'user(emailAddress,displayName)'])
+    );
+
+    return [
+        'email' => $about->getUser()->getEmailAddress(),
+        'name'  => $about->getUser()->getDisplayName(),
+    ];
+}
+
+public function scopes(): array
+{
+    // No viene de Drive API; si querés ver scopes, lo más simple es loguearlo desde el Client.
+    return []; 
+}
+
 
     public function deleteByNameInFolder(string $folderId, string $name): void
     {
@@ -165,10 +183,19 @@ class DriveService
         return $file->id;
     }
 
-    /**
-     * Crea un Google Spreadsheet dentro de una carpeta y devuelve el ID.
-     * Si ya existe un archivo con el mismo nombre en esa carpeta, reutiliza ese ID (idempotencia).
-     */
+    public function renameFile(string $fileId, string $newName): void
+    {
+        $meta = new \Google\Service\Drive\DriveFile(['name' => $newName]);
+
+        GoogleRetry::call(fn() =>
+            $this->drive->files->update($fileId, $meta, [
+                'fields' => 'id,name',
+                'supportsAllDrives' => true,
+            ])
+        );
+    }
+
+
     public function createSpreadsheetInFolder(string $name, string $folderId): string
     {
         // Idempotencia: si ya existe un archivo con *exacto* ese nombre, lo reusamos
@@ -208,7 +235,75 @@ class DriveService
         return (count($res->files) > 0) ? $res->files[0]->id : null;
     }
 
+    public function copyFileToFolder(string $fileId, string $newName, string $folderId): string
+    {
+        $copy = new \Google\Service\Drive\DriveFile([
+            'name'    => $newName,
+            'parents' => [$folderId],
+        ]);
 
+        $created = GoogleRetry::call(fn() =>
+            $this->drive->files->copy($fileId, $copy, ['fields' => 'id'])
+        );
+
+        return $created->getId();
+    }
+
+    public function getFileName(string $fileId): string
+    {
+        $f = \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->get($fileId, ['fields' => 'id,name'])
+        );
+        return $f->name;
+    }
+
+
+
+    public function deleteFolderRecursive(string $folderId): void
+    {
+        // Borra hijos primero
+        $pageToken = null;
+        do {
+            $res = GoogleRetry::call(fn() =>
+                $this->drive->files->listFiles([
+                    'q' => sprintf("'%s' in parents and trashed = false", $folderId),
+                    'fields' => 'nextPageToken, files(id, mimeType)',
+                    'pageSize' => 1000,
+                    'pageToken' => $pageToken,
+                ])
+            );
+
+            foreach ($res->files as $f) {
+                if (($f->mimeType ?? '') === 'application/vnd.google-apps.folder') {
+                    $this->deleteFolderRecursive($f->id);
+                } else {
+                    $this->deleteFileById($f->id);
+                }
+            }
+
+            $pageToken = $res->nextPageToken ?? null;
+        } while ($pageToken);
+
+        // Borra la carpeta
+        $this->deleteFileById($folderId);
+    }
+
+
+    public function ensurePacienteFolders(string $pacienteNombre): array
+    {
+        $root = (string) config('services.google.pacientes_folder_id');
+        if ($root === '') {
+            throw new \RuntimeException('Falta services.google.pacientes_folder_id');
+        }
+
+        $pacienteFolderId = $this->ensureFolderByName($pacienteNombre, $root);
+        $imagenesFolderId = $this->ensureFolderByName('Imagenes', $pacienteFolderId);
+
+        return [
+            'pacienteFolderId' => $pacienteFolderId,
+            'imagenesFolderId' => $imagenesFolderId,
+        ];
+    }
 
     public function getShareLink(string $fileId): string
     {

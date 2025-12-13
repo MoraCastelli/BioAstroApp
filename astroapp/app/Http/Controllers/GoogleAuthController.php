@@ -15,7 +15,7 @@ class GoogleAuthController extends Controller
         $c->setAccessType('offline');
         $c->setPrompt('consent');
         $c->setScopes([
-            \Google\Service\Drive::DRIVE_FILE,
+            \Google\Service\Drive::DRIVE,
             \Google\Service\Sheets::SPREADSHEETS,
         ]);
         return $c;

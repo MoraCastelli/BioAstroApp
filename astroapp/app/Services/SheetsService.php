@@ -70,23 +70,54 @@ class SheetsService
     private function ensurePerfil(string $spreadsheetId): void
     {
         $this->ensureSheet($spreadsheetId, 'Perfil');
+
+        $headers = new ValueRange([
+            'values' => [[ 'CLAVE', 'VALOR' ]],
+        ]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Perfil!A1:B1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
+        );
     }
+
 
     private function ensureEncuentros(string $spreadsheetId): void
     {
         $this->ensureSheet($spreadsheetId, 'Encuentros');
 
-        // Cabeceras en A1:E1
         $headers = new ValueRange([
             'values' => [[
-                'FECHA','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN','EDAD_EN_ESE_ENCUENTRO'
+                'NRO_DE_ENCUENTRO','FECHA','EDAD_EN_ESE_ENCUENTRO','CIUDAD_ULT_CUMPLE','TEMAS_TRATADOS','RESUMEN'
             ]],
         ]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->update(
                 $spreadsheetId,
-                'Encuentros!A1:E1',
+                'Encuentros!A1:F1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
+
+    private function ensureImagenes(string $spreadsheetId): void
+    {
+        $this->ensureSheet($spreadsheetId, 'Imagenes');
+
+        $headers = new ValueRange([
+            'values' => [[ 'NOMBRE_IMAGEN','URL','DESCRIPCION' ]],
+        ]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Imagenes!A1:C1',
                 $headers,
                 ['valueInputOption' => 'RAW']
             )
@@ -98,13 +129,19 @@ class SheetsService
         $this->ensureSheet($spreadsheetId, 'IndicePacientes');
 
         $headers = new ValueRange([
-            'values' => [[ 'NOMBRE_APELLIDO','SPREADSHEET_ID','ULTIMA_ACTUALIZACION' ]],
+            'values' => [[
+                'NOMBRE_APELLIDO',
+                'SPREADSHEET_ID',
+                'ULTIMA_ACTUALIZACION',
+                'FOLDER_ID',
+                'IMAGENES_FOLDER_ID',
+            ]],
         ]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->update(
                 $spreadsheetId,
-                'IndicePacientes!A1:C1',
+                'IndicePacientes!A1:E1',
                 $headers,
                 ['valueInputOption' => 'RAW']
             )
@@ -122,15 +159,15 @@ class SheetsService
 
         $values = GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values
-                 ->get($indiceSpreadsheetId, 'IndicePacientes!A2:C10000')
-                 ->getValues() ?? []
+                ->get($indiceSpreadsheetId, 'IndicePacientes!A2:E10000')
+                ->getValues() ?? []
         );
 
-        return array_values(array_map(fn($r) => [
+        return array_values(array_filter(array_map(fn($r) => [
             'nombre' => $r[0] ?? '',
             'id'     => $r[1] ?? '',
             'ts'     => $r[2] ?? '',
-        ], $values));
+        ], $values), fn($row) => trim($row['id']) !== ''));
     }
 
     /* ======================= Perfil ======================= */
@@ -139,9 +176,8 @@ class SheetsService
     {
         $this->ensurePerfil($spreadsheetId);
 
-        $range = 'Perfil!A1:B1000';
         $values = GoogleRetry::call(fn() =>
-            $this->sheets->spreadsheets_values->get($spreadsheetId, $range)->getValues() ?? []
+            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Perfil!A2:B1000')->getValues() ?? []
         );
 
         $out = [];
@@ -153,39 +189,45 @@ class SheetsService
         return $out;
     }
 
+
     public function setPerfil(string $spreadsheetId, array $kv): void
     {
         $this->ensurePerfil($spreadsheetId);
+
         $keys = [
             'NOMBRE_Y_APELLIDO','FOTO_URL','CONTACTO','FECHA_NAC','HORA_NAC',
             'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
             'CIUDAD_ULT_CUMPLE','PROV_ULT_CUMPLE','PAIS_ULT_CUMPLE','OBSERVACIONES',
             'FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD',
-            'SIGNO_SOLAR','FECHA_ENCUENTRO_INICIAL','HORA_ENCUENTRO_INICIAL','EDAD_EN_ENCUENTRO_INICIAL',
+            'SIGNO_SOLAR',
             'SIGNO_SUBYACENTE','BALANCE_ENERGETICO','DISPOSITORES','PROGRESIONES_RETORNOS',
             'FASE_LUNACION_NATAL','PLANETA_ASOCIADO_LUNACION',
             'SIGNO_SABIANO','GRADO_SABIANO','TITULO_SABIANO','IMAGEN_SABIANO','TEXTO_SABIANO',
             'SIGNO_SOL','GRADO_SOL','SIGNO_LUNA','GRADO_LUNA',
             'SIGNO_ASOCIADO_LUNACION','IMAGEN_FASE_LUNACION','TEXTO_FASE_LUNACION',
             'PRIMERA_VEZ_ASTROLOGIA','PROFESION','VIVO_CON','HOGAR_INFANCIA','ENF_INFANCIA',
-            'SINTOMAS_ACTUALES','MOTIVO_CONSULTA','DETALLE_ENCUENTRO_INICIAL',
-            'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO','ULTIMA_ACTUALIZACION'
+            'SINTOMAS_ACTUALES','MOTIVO_CONSULTA',
+            'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO',
+            'ULTIMA_ACTUALIZACION'
         ];
 
+        // filas: KEY | VALUE desde la fila 2
         $rows = array_map(fn($k) => [$k, $kv[$k] ?? ''], $keys);
-        $body = new ValueRange(['values' => $rows]);
+
+        // escribimos header + rows
+        $body = new ValueRange(['values' => array_merge([['CLAVE','VALOR']], $rows)]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->update(
                 $spreadsheetId,
-                'Perfil!A1:B'.count($rows),
+                'Perfil!A1:B'.(count($rows)+1),
                 $body,
                 ['valueInputOption' => 'RAW']
             )
         );
     }
 
-    /** Inicializa la pestaña Perfil con todas las claves vacías. */
+
     public function seedPerfil(string $spreadsheetId): void
     {
         $this->ensurePerfil($spreadsheetId);
@@ -195,30 +237,31 @@ class SheetsService
             'CIUDAD_NAC','PROVINCIA_NAC','PAIS_NAC','ANIO_NAC',
             'CIUDAD_ULT_CUMPLE','PROV_ULT_CUMPLE','PAIS_ULT_CUMPLE','OBSERVACIONES',
             'FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD',
-            'SIGNO_SOLAR','FECHA_ENCUENTRO_INICIAL','HORA_ENCUENTRO_INICIAL','EDAD_EN_ENCUENTRO_INICIAL',
+            'SIGNO_SOLAR',
             'SIGNO_SUBYACENTE','BALANCE_ENERGETICO','DISPOSITORES','PROGRESIONES_RETORNOS',
             'FASE_LUNACION_NATAL','PLANETA_ASOCIADO_LUNACION',
             'SIGNO_SABIANO','GRADO_SABIANO','TITULO_SABIANO','IMAGEN_SABIANO','TEXTO_SABIANO',
             'SIGNO_SOL','GRADO_SOL','SIGNO_LUNA','GRADO_LUNA',
             'SIGNO_ASOCIADO_LUNACION','IMAGEN_FASE_LUNACION','TEXTO_FASE_LUNACION',
             'PRIMERA_VEZ_ASTROLOGIA','PROFESION','VIVO_CON','HOGAR_INFANCIA','ENF_INFANCIA',
-            'SINTOMAS_ACTUALES','MOTIVO_CONSULTA','DETALLE_ENCUENTRO_INICIAL',
-            'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO','ULTIMA_ACTUALIZACION'
+            'SINTOMAS_ACTUALES','MOTIVO_CONSULTA',
+            'RESUMEN_PARA_PSICOLOGA_URL_AUDIO','RESUMEN_PARA_PSICOLOGA_TEXTO',
+            'ULTIMA_ACTUALIZACION'
         ];
 
-
         $rows = array_map(fn($k) => [$k, ''], $keys);
-        $body = new ValueRange(['values' => $rows]);
+        $body = new ValueRange(['values' => array_merge([['CLAVE','VALOR']], $rows)]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->update(
                 $spreadsheetId,
-                'Perfil!A1:B'.count($rows),
+                'Perfil!A1:B'.(count($rows)+1),
                 $body,
                 ['valueInputOption' => 'RAW']
             )
         );
     }
+
 
     /* ======================= Encuentros ======================= */
 
@@ -227,68 +270,189 @@ class SheetsService
         $this->ensureEncuentros($spreadsheetId);
     }
 
+    private function nextEncuentroNro(string $spreadsheetId): int
+    {
+        $this->ensureEncuentros($spreadsheetId);
+
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                ->get($spreadsheetId, 'Encuentros!A2:A100000')
+                ->getValues() ?? []
+        );
+
+        // cuenta filas no vacías en col A
+        $count = 0;
+        foreach ($values as $r) {
+            if (!empty($r[0])) $count++;
+        }
+        return $count + 1;
+    }
+
     public function appendEncuentro(string $spreadsheetId, array $enc): void
     {
         $this->ensureEncuentros($spreadsheetId);
 
+        $nro = $enc['NRO_DE_ENCUENTRO'] ?? $this->nextEncuentroNro($spreadsheetId);
+
         $row = [
+            $nro,
             $enc['FECHA'] ?? '',
+            $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '',
             $enc['CIUDAD_ULT_CUMPLE'] ?? '',
             $enc['TEMAS_TRATADOS'] ?? '',
             $enc['RESUMEN'] ?? '',
-            $enc['EDAD_EN_ESE_ENCUENTRO'] ?? '',
         ];
+
         $body = new ValueRange(['values' => [ $row ]]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->append(
                 $spreadsheetId,
-                'Encuentros!A1:E1',
+                'Encuentros!A1:F1',
                 $body,
-                ['valueInputOption' => 'RAW']
+                ['valueInputOption' => 'RAW', 'insertDataOption' => 'INSERT_ROWS']
             )
         );
     }
 
-    /* ======================= Índice ======================= */
-
-    public function updateIndice(string $indiceSpreadsheetId, array $fila): void
+    public function appendImagen(string $spreadsheetId, array $img): void
     {
-        $this->ensureIndice($indiceSpreadsheetId);
+        $this->ensureImagenes($spreadsheetId);
 
-        $body = new ValueRange(['values' => [ $fila ]]);
+        $row = [
+            $img['NOMBRE_IMAGEN'] ?? '',
+            $img['URL'] ?? '',
+            $img['DESCRIPCION'] ?? '',
+        ];
+
+        $body = new ValueRange(['values' => [ $row ]]);
 
         GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->append(
-                $indiceSpreadsheetId,
-                'IndicePacientes!A1:C1',
+                $spreadsheetId,
+                'Imagenes!A1:C1',
                 $body,
-                ['valueInputOption' => 'RAW']
+                ['valueInputOption' => 'RAW', 'insertDataOption' => 'INSERT_ROWS']
             )
         );
     }
 
+    public function renameSpreadsheet(string $spreadsheetId, string $newTitle): void
+    {
+        $requests = [
+            new \Google\Service\Sheets\Request([
+                'updateSpreadsheetProperties' => [
+                    'properties' => ['title' => $newTitle],
+                    'fields' => 'title',
+                ],
+            ]),
+        ];
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            )
+        );
+    }
+
+
+    public function createPacienteLibroDesdeTemplateEnCarpeta(
+        string $templateSpreadsheetId,
+        string $folderId,
+        string $tempName = 'Paciente (sin nombre)'
+    ): string {
+        $newSpreadsheetId = DriveService::make()->copyFileToFolder($templateSpreadsheetId, $tempName, $folderId);
+
+        $this->ensurePerfil($newSpreadsheetId);
+        $this->ensureEncuentros($newSpreadsheetId);
+        $this->ensureImagenes($newSpreadsheetId);
+
+        return $newSpreadsheetId;
+    }
+
+
+
+    /* ======================= Índice ======================= */
+
+    public function upsertIndice(string $indiceSpreadsheetId, array $fila): void
+    {
+        $this->ensureIndice($indiceSpreadsheetId);
+
+        // fila esperada: [nombre, spreadsheetId, ts, ...]
+        $nombre = $fila[0] ?? '';
+        $id     = $fila[1] ?? '';
+        $ts     = $fila[2] ?? '';
+
+        if (!$id) return;
+
+        $range = 'IndicePacientes!A2:C10000';
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($indiceSpreadsheetId, $range)->getValues() ?? []
+        );
+
+        // buscar id existente en columna B
+        $rowIndex = null; // 0-based sobre values
+        foreach ($values as $i => $r) {
+            if (($r[1] ?? '') === $id) {
+                $rowIndex = $i;
+                break;
+            }
+        }
+
+        if ($rowIndex !== null) {
+            // update en la fila existente
+            $targetRow = 2 + $rowIndex; // porque empieza en A2
+            $body = new \Google\Service\Sheets\ValueRange([
+                'values' => [[ $nombre, $id, $ts ]]
+            ]);
+
+            GoogleRetry::call(fn() =>
+                $this->sheets->spreadsheets_values->update(
+                    $indiceSpreadsheetId,
+                    "IndicePacientes!A{$targetRow}:C{$targetRow}",
+                    $body,
+                    ['valueInputOption' => 'RAW']
+                )
+            );
+        } else {
+            // append si no existe
+            $body = new \Google\Service\Sheets\ValueRange(['values' => [[$nombre, $id, $ts]]]);
+
+            GoogleRetry::call(fn() =>
+                $this->sheets->spreadsheets_values->append(
+                    $indiceSpreadsheetId,
+                    'IndicePacientes!A1:C1',
+                    $body,
+                    ['valueInputOption' => 'RAW', 'insertDataOption' => 'INSERT_ROWS']
+                )
+            );
+        }
+    }
+
+
     public function readEncuentros(string $spreadsheetId): array
     {
-        // Asegura que exista la hoja y cabeceras
         $this->ensureEncuentrosSheet($spreadsheetId);
 
-        $values = $this->sheets->spreadsheets_values
-            ->get($spreadsheetId, 'Encuentros!A2:E100000')
-            ->getValues() ?? [];
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                ->get($spreadsheetId, 'Encuentros!A2:F100000')
+                ->getValues() ?? []
+        );
 
-        // Map a claves esperadas
         return array_values(array_filter(array_map(fn($r) => [
-            'FECHA'                   => $r[0] ?? '',
-            'CIUDAD_ULT_CUMPLE'       => $r[1] ?? '',
-            'TEMAS_TRATADOS'          => $r[2] ?? '',
-            'RESUMEN'                 => $r[3] ?? '',
-            'EDAD_EN_ESE_ENCUENTRO'   => $r[4] ?? '',
+            'NRO_DE_ENCUENTRO'         => $r[0] ?? '',
+            'FECHA'                   => $r[1] ?? '',
+            'EDAD_EN_ESE_ENCUENTRO'   => $r[2] ?? '',
+            'CIUDAD_ULT_CUMPLE'       => $r[3] ?? '',
+            'TEMAS_TRATADOS'          => $r[4] ?? '',
+            'RESUMEN'                 => $r[5] ?? '',
         ], $values), function ($row) {
-            // Filtramos filas vacías o que contengan nombres de campos en lugar de fechas
-            return !empty($row['FECHA']) && !preg_match('/^[A-Z_]+$/', trim($row['FECHA']));
+            return !empty($row['FECHA']) && !preg_match('/^[A-Z_]+$/', trim((string)$row['FECHA']));
         }));
     }
+
 
 
     /* ======================= Utilidad ======================= */
