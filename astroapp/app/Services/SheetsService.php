@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Support\GoogleRetry;
 use Google\Service\Sheets;
 use Google\Service\Sheets\ValueRange;
+use Illuminate\Support\Facades\Storage;
 
 class SheetsService
 {
@@ -167,7 +168,10 @@ class SheetsService
             'nombre' => $r[0] ?? '',
             'id'     => $r[1] ?? '',
             'ts'     => $r[2] ?? '',
+            'folder_id' => $r[3] ?? '',
+            'imagenes_folder_id' => $r[4] ?? '',
         ], $values), fn($row) => trim($row['id']) !== ''));
+
     }
 
     /* ======================= Perfil ======================= */
@@ -337,6 +341,24 @@ class SheetsService
         );
     }
 
+    public function readImagenes(string $spreadsheetId): array
+    {
+        $this->ensureImagenes($spreadsheetId);
+
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                ->get($spreadsheetId, 'Imagenes!A2:C100000')
+                ->getValues() ?? []
+        );
+
+        return array_values(array_filter(array_map(fn($r) => [
+            'NOMBRE_IMAGEN' => $r[0] ?? '',
+            'URL'           => $r[1] ?? '',
+            'DESCRIPCION'   => $r[2] ?? '',
+        ], $values), fn($row) => trim((string)$row['URL']) !== ''));
+    }
+
+
     public function renameSpreadsheet(string $spreadsheetId, string $newTitle): void
     {
         $requests = [
@@ -469,6 +491,79 @@ class SheetsService
 
         return $sheet->spreadsheetId;
     }
+
+    /* ======================= Sabianos (múltiples) ======================= */
+
+    public function ensureSabianosSheet(string $spreadsheetId): void
+    {
+        // Esto ya crea o renombra usando tu helper real ✅
+        $this->ensureSheet($spreadsheetId, 'Sabianos');
+
+        // Header
+        $headers = new ValueRange([
+            'values' => [[ 'FECHA','SIGNO','GRADO','TITULO','TEXTO','IMAGEN' ]],
+        ]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Sabianos!A1:F1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
+
+    public function readSabianos(string $spreadsheetId): array
+    {
+        $this->ensureSabianosSheet($spreadsheetId);
+
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                ->get($spreadsheetId, 'Sabianos!A2:F10000')
+                ->getValues() ?? []
+        );
+
+        $out = array_map(fn($r) => [
+            'FECHA'  => $r[0] ?? '',
+            'SIGNO'  => $r[1] ?? '',
+            'GRADO'  => $r[2] ?? '',
+            'TITULO' => $r[3] ?? '',
+            'TEXTO'  => $r[4] ?? '',
+            'IMAGEN' => $r[5] ?? '',
+        ], $values);
+
+        // filtrar filas vacías
+        return array_values(array_filter($out, function ($row) {
+            return trim((string)($row['SIGNO'] ?? '')) !== '' || trim((string)($row['GRADO'] ?? '')) !== '';
+        }));
+    }
+
+    public function appendSabiano(string $spreadsheetId, array $row): void
+    {
+        $this->ensureSabianosSheet($spreadsheetId);
+
+        $values = [[
+            $row['FECHA']  ?? '',
+            $row['SIGNO']  ?? '',
+            $row['GRADO']  ?? '',
+            $row['TITULO'] ?? '',
+            $row['TEXTO']  ?? '',
+            $row['IMAGEN'] ?? '',
+        ]];
+
+        $body = new ValueRange(['values' => $values]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->append(
+                $spreadsheetId,
+                'Sabianos!A1:F1',
+                $body,
+                ['valueInputOption' => 'RAW', 'insertDataOption' => 'INSERT_ROWS']
+            )
+        );
+    }
+
 
     /* ======================= UTILIDADES DE ADMIN ======================= */
 

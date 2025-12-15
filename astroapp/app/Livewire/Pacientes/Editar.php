@@ -18,8 +18,31 @@ class Editar extends Component
     public string $id;
     public array $perfil = [];
     public string $mensaje = '';
-    public $fotoUpload;
 
+    public $fotoUpload; // (si después lo usás para carta/foto)
+    public string $imgUltimaUrl = '';
+
+    public array $calc = [
+        'edad' => '',
+        'fase' => ['nombre'=>'','planeta'=>'','signo'=>'','texto'=>'','imagen'=>''],
+        'sabiano' => ['titulo'=>'','imagen'=>'','texto'=>''],
+    ];
+
+    public bool $verMasCalc = false;
+
+    // Para renombre
+    private string $nombreOriginal = '';
+
+    // Imagenes (pestaña "Imagenes")
+    public $imgUpload;
+    public string $imgNombre = '';
+    public string $imgDescripcion = '';
+
+    // (si todavía no está implementado en SheetsService, lo dejamos sin romper)
+    public array $sabianos = [];
+    public array $nuevoSabiano = ['SIGNO'=>'','GRADO'=>''];
+
+    // Encuentros (lo vas a usar en otra pantalla, lo dejamos acá por compatibilidad)
     public array $nuevoEncuentro = [
         'FECHA' => '',
         'CIUDAD_ULT_CUMPLE' => '',
@@ -36,20 +59,29 @@ class Editar extends Component
         'perfil.CIUDAD_NAC' => 'nullable|string|max:80',
         'perfil.PROVINCIA_NAC' => 'nullable|string|max:80',
         'perfil.PAIS_NAC' => 'nullable|string|max:80',
-        'perfil.FECHA_ENCUENTRO_INICIAL' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
-        'perfil.HORA_ENCUENTRO_INICIAL'  => 'nullable|string|max:10',
         'perfil.RESUMEN_PARA_PSICOLOGA_URL_AUDIO' => 'nullable|url',
 
+        // carta/foto (si la seguís usando)
         'fotoUpload' => 'nullable|image|max:5120',
+
+        // subir imagen a hoja Imagenes
+        'imgUpload' => 'nullable|image|max:5120',
+        'imgNombre' => 'required_with:imgUpload|string|max:80',
+        'imgDescripcion' => 'nullable|string|max:400',
+
         'nuevoEncuentro.FECHA' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
     ];
 
-    public function mount($id)
+    public function mount($id): void
     {
-        $this->id = $id;
-        $perfil = SheetsService::make()->getPerfil($id);
+        $this->id = (string)$id;
 
-        // Claves EXACTAS según SheetsService::setPerfil()
+        $svc = SheetsService::make();
+        $perfil = $svc->getPerfil($this->id);
+
+        $this->nombreOriginal = (string)($perfil['NOMBRE_Y_APELLIDO'] ?? '');
+
+        // Defaults
         $defaults = [
             'NOMBRE_Y_APELLIDO' => '',
             'FOTO_URL' => '',
@@ -75,11 +107,7 @@ class Editar extends Component
             'SIGNO_LUNA' => '',
             'GRADO_LUNA' => '',
 
-            'SIGNO_SOLAR' => '', // aunque no lo uses lo mantenemos porque existe en Sheets
-
-            'FECHA_ENCUENTRO_INICIAL' => '',
-            'HORA_ENCUENTRO_INICIAL' => '',
-            'EDAD_EN_ENCUENTRO_INICIAL' => '',
+            'SIGNO_SOLAR' => '',
 
             'SIGNO_SUBYACENTE' => '',
             'BALANCE_ENERGETICO' => '',
@@ -113,72 +141,263 @@ class Editar extends Component
         ];
 
         $this->perfil = array_merge($defaults, $perfil);
-    }
 
-    public function updatedPerfil($value, $key)
-    {
-        // EDAD
-        if (in_array($key, ['FECHA_NAC', 'FECHA_ENCUENTRO_INICIAL'])) {
-            $this->perfil['EDAD_EN_ENCUENTRO_INICIAL'] = $this->calcularEdad(
-                $this->perfil['FECHA_NAC'] ?? null,
-                $this->perfil['FECHA_ENCUENTRO_INICIAL'] ?? null
-            );
+        // Calcs iniciales
+        $this->calc['edad'] = $this->calcularEdadHoy($this->perfil['FECHA_NAC'] ?? null);
+
+        $this->sabianos = method_exists(SheetsService::make(), 'readSabianos')
+            ? SheetsService::make()->readSabianos($this->id)
+            : [];
+
+        // Sabiano panel inicial
+        if (!empty($this->perfil['SIGNO_SABIANO']) && !empty($this->perfil['GRADO_SABIANO'])) {
+            $sab = SabianoService::get($this->perfil['SIGNO_SABIANO'], (int)$this->perfil['GRADO_SABIANO']);
+            if ($sab) {
+                $this->calc['sabiano'] = [
+                    'titulo' => $sab['titulo'] ?? '',
+                    'imagen' => $sab['imagen'] ?? '',
+                    'texto'  => $sab['texto'] ?? '',
+                ];
+            }
         }
 
-        // SABIANO
-        if (in_array($key, ['SIGNO_SABIANO', 'GRADO_SABIANO'])) {
-            $signo = $this->perfil['SIGNO_SABIANO'];
-            $grado = intval($this->perfil['GRADO_SABIANO']);
+        // Fase panel inicial
+        $solSigno  = $this->perfil['SIGNO_SOL'] ?? '';
+        $solGrado  = (int)($this->perfil['GRADO_SOL'] ?? 0);
+        $lunaSigno = $this->perfil['SIGNO_LUNA'] ?? '';
+        $lunaGrado = (int)($this->perfil['GRADO_LUNA'] ?? 0);
+
+        if ($solSigno && $solGrado && $lunaSigno && $lunaGrado) {
+            $fase = $this->calcularFaseLunacionInterno($solSigno, $solGrado, $lunaSigno, $lunaGrado);
+            if ($fase) {
+                $this->calc['fase'] = [
+                    'nombre' => $fase['nombre'] ?? '',
+                    'planeta'=> $fase['planeta'] ?? '',
+                    'signo'  => $fase['signo'] ?? '',
+                    'texto'  => $fase['texto'] ?? '',
+                    'imagen' => $fase['imagen'] ?? '',
+                ];
+            }
+        }
+
+        // Sabianos extra (si existe el método)
+        try {
+            if (method_exists($svc, 'readSabianos')) {
+                $this->sabianos = $svc->readSabianos($this->id);
+            }
+        } catch (\Throwable $e) {
+            $this->sabianos = [];
+        }
+    }
+
+    public function agregarSabiano(): void
+    {
+        $signo = trim((string)($this->nuevoSabiano['SIGNO'] ?? ''));
+        $grado = (int)($this->nuevoSabiano['GRADO'] ?? 0);
+
+        if ($signo === '' || $grado < 1 || $grado > 30) {
+            $this->addError('nuevoSabiano', 'Signo y grado (1 a 30) requeridos.');
+            return;
+        }
+
+        $sab = SabianoService::get($signo, $grado);
+        if (!$sab) {
+            $this->addError('nuevoSabiano', 'No encontré ese sabiano.');
+            return;
+        }
+
+        SheetsService::make()->appendSabiano($this->id, [
+            'FECHA'  => now()->format('d/m/Y'),
+            'SIGNO'  => $signo,
+            'GRADO'  => $grado,
+            'TITULO' => $sab['titulo'] ?? '',
+            'TEXTO'  => $sab['texto'] ?? '',
+            'IMAGEN' => $sab['imagen'] ?? '',
+        ]);
+
+        // refrescar lista
+        $this->sabianos = SheetsService::make()->readSabianos($this->id);
+        $this->nuevoSabiano = ['SIGNO'=>'','GRADO'=>''];
+        $this->dispatch('sabiano-added');
+        $this->mensaje = 'Sabiano agregado ✔';
+        // limpiar form + errores
+        $this->reset('nuevoSabiano');
+        $this->resetErrorBag('nuevoSabiano');
+
+        // opcional: mensaje
+        $this->mensaje = 'Sabiano agregado ✔';
+
+        // cerrar modal desde JS
+        $this->dispatch('sabiano-added');
+    }
+
+
+    public function updatedPerfil($value, $key): void
+    {
+        // Edad actual
+        if ($key === 'FECHA_NAC') {
+            $this->calc['edad'] = $this->calcularEdadHoy($this->perfil['FECHA_NAC'] ?? null);
+        }
+
+        // Sabiano
+        if (in_array($key, ['SIGNO_SABIANO', 'GRADO_SABIANO'], true)) {
+            $signo = $this->perfil['SIGNO_SABIANO'] ?? '';
+            $grado = (int)($this->perfil['GRADO_SABIANO'] ?? 0);
 
             if ($signo && $grado) {
                 $sab = SabianoService::get($signo, $grado);
                 if ($sab) {
                     $this->perfil['TITULO_SABIANO'] = $sab['titulo'] ?? '';
                     $this->perfil['IMAGEN_SABIANO'] = $sab['imagen'] ?? '';
-                    $this->perfil['TEXTO_SABIANO'] = $sab['texto'] ?? '';
+                    $this->perfil['TEXTO_SABIANO']  = $sab['texto'] ?? '';
+
+                    $this->calc['sabiano'] = [
+                        'titulo' => $this->perfil['TITULO_SABIANO'],
+                        'imagen' => $this->perfil['IMAGEN_SABIANO'],
+                        'texto'  => $this->perfil['TEXTO_SABIANO'],
+                    ];
                 }
             }
         }
 
-        // LUNACIÓN
-        if (in_array($key, ['SIGNO_SOL','GRADO_SOL','SIGNO_LUNA','GRADO_LUNA'])) {
-
-            $solSigno  = $this->perfil['SIGNO_SOL'];
-            $solGrado  = intval($this->perfil['GRADO_SOL']);
-            $lunaSigno = $this->perfil['SIGNO_LUNA'];
-            $lunaGrado = intval($this->perfil['GRADO_LUNA']);
+        // Lunación
+        if (in_array($key, ['SIGNO_SOL','GRADO_SOL','SIGNO_LUNA','GRADO_LUNA'], true)) {
+            $solSigno  = $this->perfil['SIGNO_SOL'] ?? '';
+            $solGrado  = (int)($this->perfil['GRADO_SOL'] ?? 0);
+            $lunaSigno = $this->perfil['SIGNO_LUNA'] ?? '';
+            $lunaGrado = (int)($this->perfil['GRADO_LUNA'] ?? 0);
 
             if ($solSigno && $solGrado && $lunaSigno && $lunaGrado) {
-
                 $fase = $this->calcularFaseLunacionInterno($solSigno, $solGrado, $lunaSigno, $lunaGrado);
-
                 if ($fase) {
                     $this->perfil['FASE_LUNACION_NATAL']       = $fase['nombre'];
                     $this->perfil['PLANETA_ASOCIADO_LUNACION'] = $fase['planeta'];
                     $this->perfil['SIGNO_ASOCIADO_LUNACION']   = $fase['signo'];
                     $this->perfil['IMAGEN_FASE_LUNACION']      = $fase['imagen'];
                     $this->perfil['TEXTO_FASE_LUNACION']       = $fase['texto'];
+
+                    $this->calc['fase'] = [
+                        'nombre' => $this->perfil['FASE_LUNACION_NATAL'],
+                        'planeta'=> $this->perfil['PLANETA_ASOCIADO_LUNACION'],
+                        'signo'  => $this->perfil['SIGNO_ASOCIADO_LUNACION'],
+                        'texto'  => $this->perfil['TEXTO_FASE_LUNACION'],
+                        'imagen' => $this->perfil['IMAGEN_FASE_LUNACION'],
+                    ];
                 }
             }
         }
     }
 
-    private function calcularEdad(?string $nac, ?string $ref): string
+    public function subirImagenPaciente(): void
+    {
+        $this->validateImagenForm();
+
+        $folderImgs = $this->getPacienteImagesFolderId();
+
+        $ext = $this->imgUpload->getClientOriginalExtension() ?: 'jpg';
+
+        $safeTitle = (string) Str::of($this->imgNombre)
+            ->trim()
+            ->replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')
+            ->limit(60, '');
+
+        Storage::disk('local')->makeDirectory('tmp');
+
+        $tmpName = 'up_' . Str::random(20) . '.' . $ext;
+
+        $tmpPath = $this->imgUpload->storeAs('tmp', $tmpName, 'local');
+        if (!$tmpPath) {
+            throw new \RuntimeException('No se pudo guardar el archivo temporal (storeAs devolvió null/false).');
+        }
+
+        $absPath = Storage::disk('local')->path($tmpPath);
+        if (!is_file($absPath)) {
+            throw new \RuntimeException("Archivo temporal no existe: {$absPath}");
+        }
+
+        $drive = DriveService::make();
+
+        $fileName = $safeTitle . ' - ' . now()->format('Ymd_His') . '.' . $ext;
+
+        $fileId = $drive->uploadImageToFolder($absPath, $fileName, $folderImgs);
+        $drive->makeAnyoneReader($fileId);
+        $url = $drive->getPublicContentUrl($fileId);
+
+        SheetsService::make()->appendImagen($this->id, [
+            'NOMBRE_IMAGEN' => (string) $this->imgNombre,
+            'URL'           => $url,
+            'DESCRIPCION'   => (string) $this->imgDescripcion,
+        ]);
+
+        Storage::disk('local')->delete($tmpPath);
+
+        $this->imgUltimaUrl = $url;
+        $this->reset(['imgUpload', 'imgNombre', 'imgDescripcion']);
+
+        $this->mensaje = 'Imagen cargada y registrada ✔';
+    }
+
+    private function validateImagenForm(): void
+    {
+        $this->validate([
+            'imgUpload'      => 'required|image|max:5120',
+            'imgNombre'      => 'required|string|max:80',
+            'imgDescripcion' => 'nullable|string|max:400',
+        ]);
+    }
+
+    private function calcularEdadHoy(?string $nac): string
     {
         try {
-            if (!$nac || !$ref) return '';
-            return Carbon::createFromFormat('d/m/Y', $nac)
-                ->diffInYears(Carbon::createFromFormat('d/m/Y', $ref));
+            if (!$nac) return '';
+            $years = Carbon::createFromFormat('d/m/Y', trim($nac))
+                ->diffInYears(Carbon::today());
+            return (string) ((int) $years);
         } catch (\Throwable $e) {
             return '';
         }
     }
 
+    /**
+     * ✅ SIEMPRE usa la carpeta padre REAL del spreadsheet.
+     * Así no te separa "Morita" vs "Paciente sin nombre".
+     */
+    private function getPacienteImagesFolderId(): string
+    {
+        $drive = DriveService::make();
+        $parents = $drive->getParents($this->id);
+        $folderPaciente = $parents[0] ?? null;
+
+        if (!$folderPaciente) {
+            throw new \RuntimeException('No pude detectar la carpeta padre del Spreadsheet del paciente.');
+        }
+
+        return $drive->ensureChildFolder($folderPaciente, 'Imagenes');
+    }
+
     public function guardar()
     {
+        // ✅ corregido: antes tenías $this->validate();q
         $this->validate();
-        $this->perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
 
+        $nuevoNombre = trim((string)($this->perfil['NOMBRE_Y_APELLIDO'] ?? ''));
+        if ($nuevoNombre === '') $nuevoNombre = 'Paciente';
+
+        // Si cambió el nombre, renombramos spreadsheet y carpeta padre
+        if ($this->nombreOriginal !== $nuevoNombre) {
+            SheetsService::make()->renameSpreadsheet($this->id, $nuevoNombre);
+
+            $drive = DriveService::make();
+            $parents = $drive->getParents($this->id);
+            if (!empty($parents[0])) {
+                // la carpeta padre del sheet es la carpeta del paciente
+                $drive->renameFile($parents[0], $nuevoNombre);
+            }
+
+            $this->nombreOriginal = $nuevoNombre;
+        }
+
+        $this->perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
         SheetsService::make()->setPerfil($this->id, $this->perfil);
 
         return redirect()->route('paciente.ver', ['id' => $this->id]);
@@ -201,16 +420,15 @@ class Editar extends Component
             'acuario' => 300,
             'piscis' => 330,
         ];
-        return $offsets[$signo] ?? null
-            ? $offsets[$signo] + $grado
-            : null;
+
+        if (!array_key_exists($signo, $offsets)) return null;
+        return $offsets[$signo] + $grado;
     }
 
     private function calcularFaseLunacionInterno(string $signoSol, int $gradoSol, string $signoLuna, int $gradoLuna): ?array
     {
         $sol  = $this->zodiacToDegrees($signoSol, $gradoSol);
         $luna = $this->zodiacToDegrees($signoLuna, $gradoLuna);
-
         if ($sol === null || $luna === null) return null;
 
         $angulo = fmod(($luna - $sol + 360), 360);

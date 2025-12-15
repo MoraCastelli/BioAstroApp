@@ -15,24 +15,24 @@ class DriveService
         $client = GoogleClientFactory::make();
         return new self(new Drive($client));
     }
+
     public function whoAmI(): array
-{
-    $about = \App\Support\GoogleRetry::call(fn() =>
-        $this->drive->about->get(['fields' => 'user(emailAddress,displayName)'])
-    );
+    {
+        $about = \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->about->get(['fields' => 'user(emailAddress,displayName)'])
+        );
 
-    return [
-        'email' => $about->getUser()->getEmailAddress(),
-        'name'  => $about->getUser()->getDisplayName(),
-    ];
-}
+        return [
+            'email' => $about->getUser()->getEmailAddress(),
+            'name'  => $about->getUser()->getDisplayName(),
+        ];
+    }
 
-public function scopes(): array
-{
-    // No viene de Drive API; si querés ver scopes, lo más simple es loguearlo desde el Client.
-    return []; 
-}
-
+    public function scopes(): array
+    {
+        // No viene de Drive API; si querés ver scopes, lo más simple es loguearlo desde el Client.
+        return []; 
+    }
 
     public function deleteByNameInFolder(string $folderId, string $name): void
     {
@@ -46,6 +46,21 @@ public function scopes(): array
             GoogleRetry::call(fn() => $this->drive->files->delete($res->files[0]->id));
         }
     }
+
+    public function getParents(string $fileId): array
+    {
+        $file = \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->get($fileId, ['fields' => 'parents'])
+        );
+        return $file->getParents() ?? [];
+    }
+
+    public function ensureChildFolder(string $parentId, string $title): string
+    {
+        $id = $this->findByNameInFolder($parentId, $title);
+        return $id ?: $this->createFolder($title, $parentId);
+    }
+
 
     /** Sube un PDF a la carpeta “Archivos” (config services.google.files_folder_id). */
     public function uploadPdfToFiles(string $localPdfPath, string $name): string
@@ -185,16 +200,11 @@ public function scopes(): array
 
     public function renameFile(string $fileId, string $newName): void
     {
-        $meta = new \Google\Service\Drive\DriveFile(['name' => $newName]);
-
-        GoogleRetry::call(fn() =>
-            $this->drive->files->update($fileId, $meta, [
-                'fields' => 'id,name',
-                'supportsAllDrives' => true,
-            ])
+        $file = new \Google\Service\Drive\DriveFile(['name' => $newName]);
+        \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->update($fileId, $file, ['fields' => 'id,name'])
         );
     }
-
 
     public function createSpreadsheetInFolder(string $name, string $folderId): string
     {
@@ -291,9 +301,9 @@ public function scopes(): array
 
     public function ensurePacienteFolders(string $pacienteNombre): array
     {
-        $root = (string) config('services.google.pacientes_folder_id');
+        $root = (string) config('services.google.db_folder_id'); // ✅
         if ($root === '') {
-            throw new \RuntimeException('Falta services.google.pacientes_folder_id');
+            throw new \RuntimeException('Falta services.google.db_folder_id');
         }
 
         $pacienteFolderId = $this->ensureFolderByName($pacienteNombre, $root);
@@ -303,6 +313,25 @@ public function scopes(): array
             'pacienteFolderId' => $pacienteFolderId,
             'imagenesFolderId' => $imagenesFolderId,
         ];
+    }
+
+    public function moveFileToFolder(string $fileId, string $newFolderId): void
+    {
+        $parents = $this->getParents($fileId);
+        $removeParents = implode(',', $parents);
+
+        GoogleRetry::call(fn() =>
+            $this->drive->files->update(
+                $fileId,
+                new DriveFile(),
+                [
+                    'addParents' => $newFolderId,
+                    'removeParents' => $removeParents,
+                    'fields' => 'id, parents',
+                    'supportsAllDrives' => true,
+                ]
+            )
+        );
     }
 
     public function getShareLink(string $fileId): string

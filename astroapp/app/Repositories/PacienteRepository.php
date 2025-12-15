@@ -174,17 +174,33 @@ class PacienteRepository
         }
     }
 
-
-
-
     public function guardarPerfil(string $spreadsheetId, array $perfil): void
     {
+        $antes = $this->sheets->getPerfil($spreadsheetId);
+        $nombreAntes = trim((string)($antes['NOMBRE_Y_APELLIDO'] ?? ''));
+        $nombreNuevo = trim((string)($perfil['NOMBRE_Y_APELLIDO'] ?? ''));
+
         $perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
         $this->sheets->setPerfil($spreadsheetId, $perfil);
 
-        // Cada vez que se guarda el perfil, refrescamos PDF
+        if ($nombreNuevo !== '' && $nombreNuevo !== $nombreAntes) {
+            // renombrar spreadsheet (Drive)
+            $this->drive->renameFile($spreadsheetId, $nombreNuevo);
+
+            // actualizar índice (upsert)
+            $indiceId = config('services.google.index_id');
+            if ($indiceId) {
+                $this->sheets->upsertIndice($indiceId, [
+                    $nombreNuevo,
+                    $spreadsheetId,
+                    Carbon::now()->toIso8601String(),
+                ]);
+            }
+        }
+
         $this->regenerarPdf($spreadsheetId);
     }
+
 
     public function agregarEncuentro(string $spreadsheetId, array $enc): void
     {
