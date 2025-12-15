@@ -166,14 +166,11 @@
       </div>
     </section>
 
-      {{-- SABIANO --}}
+    {{-- SABIANO (PRINCIPAL) --}}
     <section class="bg-white p-5 rounded-xl shadow border border-gray-100">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold text-lg mb-3">Grado Sabiano (principal)</h2>
 
-        {{-- Este botón NO debería volver a editar la misma página.
-            Lo correcto es ir a editar, o abrir un modal en Editar.
-        --}}
         <a href="{{ route('paciente.editar', $id) }}"
           class="text-sm text-emerald-700 hover:underline">
           Ir a editar y agregar sabiano extra →
@@ -215,61 +212,79 @@
           @endif
         </div>
       </div>
+    </section>
 
-      {{-- SABIANOS EXTRA (historial) --}}
-      <div class="pt-6 mt-6 border-t">
-        <h3 class="font-semibold text-base mb-3">Sabianos extra (historial)</h3>
+    {{-- SABIANOS EXTRA (MISMO ESTILO QUE PRINCIPAL) --}}
+    <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-lg">Sabianos extra</h2>
+        <span class="text-xs text-gray-500">Historial agregado desde edición</span>
+      </div>
 
-        @if(!empty($sabianos))
-          <div class="space-y-3">
-            @foreach($sabianos as $s)
-              <div class="border rounded-xl p-4 bg-gray-50">
-                <div class="flex items-start justify-between gap-4">
-                  <div class="min-w-0">
-                    <div class="text-sm">
+      @if(!empty($sabianos))
+        <div class="space-y-6">
+          @foreach($sabianos as $idx => $s)
+            <div class="pt-6 border-t first:border-t-0 first:pt-0">
+              <div class="grid md:grid-cols-3 gap-4 items-start">
+
+                {{-- IZQ: texto (igual al principal) --}}
+                <div class="md:col-span-2 space-y-3">
+                  <div class="text-sm space-y-1">
+                    <div>
                       <span class="text-gray-500">Fecha:</span>
                       <span class="font-medium">{{ $s['FECHA'] ?? '—' }}</span>
                     </div>
-                    <div class="text-sm">
+                    <div>
                       <span class="text-gray-500">Signo:</span>
                       <span class="font-medium">{{ $s['SIGNO'] ?? '—' }}</span>
-                      <span class="text-gray-400 mx-2">·</span>
+                    </div>
+                    <div>
                       <span class="text-gray-500">Grado:</span>
                       <span class="font-medium">{{ $s['GRADO'] ?? '—' }}</span>
                     </div>
-
-                    @if(!empty($s['TITULO']))
-                      <div class="font-semibold mt-1">{{ $s['TITULO'] }}</div>
-                    @endif
-
-                    @if(!empty($s['TEXTO']))
-                      <div class="mt-2 text-sm text-gray-700 whitespace-pre-line">
-                        {{ $s['TEXTO'] }}
-                      </div>
-                    @endif
+                    <div>
+                      <span class="text-gray-500">Título:</span>
+                      <span class="font-medium">{{ $s['TITULO'] ?? '—' }}</span>
+                    </div>
                   </div>
 
-                  <div class="shrink-0 w-32">
-                    @if(!empty($s['IMAGEN']))
-                      @php $sabImg = asset($s['IMAGEN']); @endphp
-                      <button type="button" class="w-full"
-                              @click="openImg('{{ $sabImg }}','Sabiano')">
-                        <img src="{{ $sabImg }}"
-                            class="w-full h-24 object-cover rounded-lg border hover:opacity-95 transition"
-                            loading="lazy">
-                        <div class="text-xs text-gray-500 mt-1 text-center">Click</div>
-                      </button>
-                    @endif
-                  </div>
+                  @if(!empty($s['TEXTO']))
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed whitespace-pre-line text-sm">
+                      {{ $s['TEXTO'] }}
+                    </div>
+                  @endif
                 </div>
+
+                {{-- DER: imagen (igual al principal) --}}
+                <div class="md:col-span-1">
+                  @if(!empty($s['IMAGEN']))
+                    @php $sabImg = asset($s['IMAGEN']); @endphp
+                    <button type="button" class="w-full text-left"
+                            @click="openImg('{{ $sabImg }}', 'Sabiano extra')">
+                      <div class="border rounded-xl p-2 bg-gray-50 hover:bg-gray-100 transition">
+                        <img src="{{ $sabImg }}"
+                            class="w-full h-32 object-cover rounded-lg"
+                            alt="Sabiano extra"
+                            loading="lazy">
+                        <div class="text-xs text-gray-500 mt-2">Click para ampliar</div>
+                      </div>
+                    </button>
+                  @else
+                    <div class="text-sm text-gray-400 italic">Sin imagen</div>
+                  @endif
+                </div>
+
               </div>
-            @endforeach
-          </div>
-        @else
-          <div class="text-sm text-gray-500 italic">Todavía no hay sabianos extra agregados.</div>
-        @endif
-      </div>
+            </div>
+          @endforeach
+        </div>
+      @else
+        <div class="text-sm text-gray-500 italic">
+          Todavía no hay sabianos extra agregados.
+        </div>
+      @endif
     </section>
+
 
   </div>
 
