@@ -333,7 +333,7 @@ class Editar extends Component
 
         $this->imgUltimaUrl = $url;
         $this->reset(['imgUpload', 'imgNombre', 'imgDescripcion']);
-
+        $url = $drive->getPublicContentUrl($fileId);
         $this->mensaje = 'Imagen cargada y registrada ✔';
     }
 

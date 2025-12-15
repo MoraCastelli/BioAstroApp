@@ -284,8 +284,6 @@
         </div>
       @endif
     </section>
-
-
   </div>
 
   {{-- IMÁGENES DEL PACIENTE (página 3) --}}
@@ -295,12 +293,27 @@
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         @foreach($imagenes as $img)
+          @php
+            $raw = (string)($img['URL'] ?? '');
+            $url = $raw;
+
+            if (preg_match('~drive\.google\.com/file/d/([^/]+)~', $raw, $m)) {
+                $url = "https://drive.google.com/uc?export=view&id={$m[1]}";
+            } elseif (preg_match('~drive\.google\.com/open\?id=([^&]+)~', $raw, $m)) {
+                $url = "https://drive.google.com/uc?export=view&id={$m[1]}";
+            }
+          @endphp
+
           <div class="border rounded-xl p-3 bg-gray-50">
-            <button type="button" class="w-full text-left"
-                    @click="openImg('{{ $img['URL'] ?? '' }}', '{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}')">
-              <img src="{{ $img['URL'] ?? '' }}"
-                   class="w-full h-36 object-cover rounded-lg border hover:opacity-95 transition"
-                   alt="{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}">
+            <button type="button"
+                    class="w-full text-left"
+                    @click="openImg('{{ $url }}', '{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}')">
+              <img src="{{ $url }}"
+                  class="w-full h-36 object-cover rounded-lg border hover:opacity-95 transition"
+                  alt="{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  onerror="this.onerror=null; this.src='{{ $url }}'.replace('export=view','export=download');">
             </button>
 
             <div class="mt-2">
@@ -315,6 +328,7 @@
       </div>
     </section>
   @endif
+
 
   {{-- RESUMEN / DETALLE --}}
   <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
