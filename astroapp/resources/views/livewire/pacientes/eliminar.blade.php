@@ -9,7 +9,7 @@
 
   <div class="bg-white p-6 rounded-xl shadow border border-gray-100 text-center space-y-4">
     <p class="text-gray-700">
-      ¿Estás segura que deseas eliminar al paciente <strong>{{ $nombre }}</strong>?
+      ¿Estás segura que deseas eliminar al paciente?
     </p>
 
     <div class="flex justify-center gap-4 mt-6">

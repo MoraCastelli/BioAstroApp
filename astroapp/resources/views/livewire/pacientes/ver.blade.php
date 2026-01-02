@@ -45,6 +45,37 @@
     </div>
   </header>
 
+  @php
+    $fotoRaw = $perfil['FOTO_URL'] ?? '';
+
+    $foto = $fotoRaw;
+
+    // Si es link de Drive, extraer FILE_ID y convertir a thumbnail
+    if (!empty($fotoRaw) && str_contains($fotoRaw, 'drive.google.com')) {
+        $id = null;
+
+        // /file/d/{id}/
+        if (preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $fotoRaw, $m)) $id = $m[1];
+
+        // ?id={id}
+        if (!$id && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $fotoRaw, $m)) $id = $m[1];
+
+        if ($id) {
+            $foto = "https://drive.google.com/thumbnail?id={$id}&sz=w1200";
+        }
+    }
+
+    // Si te llega "public/..." normalizalo
+    if (!empty($foto) && str_starts_with($foto, 'public/')) {
+        $foto = asset('storage/'.str_replace('public/', '', $foto));
+    }
+
+    // Si te llega ruta local "pacientes/..."
+    if (!empty($foto) && !str_starts_with($foto, 'http') && !str_starts_with($foto, '/')) {
+        $foto = asset('storage/'.$foto);
+    }
+  @endphp
+
   {{-- TOP GRID: FOTO + DATOS --}}
   <div class="grid lg:grid-cols-3 gap-6">
     {{-- FOTO / CARTA --}}
@@ -54,15 +85,18 @@
       @php $foto = $perfil['FOTO_URL'] ?? ''; @endphp
       @if(!empty($foto))
         <button type="button" class="w-full text-left"
-                @click="openImg('{{ $foto }}', 'Carta / Foto')">
+                @click="openImg(@js($foto), 'Carta / Foto')">
           <img src="{{ $foto }}" alt="Carta / Foto"
-               class="w-full h-56 rounded-lg object-cover border hover:opacity-95 transition"
-               onerror="if(!this.dataset.tried){this.dataset.tried=1; this.src=this.src.replace('export=view','');}">
+              class="w-full h-56 rounded-lg object-cover border hover:opacity-95 transition"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              onerror="this.style.display='none'">
           <div class="mt-2 text-xs text-gray-500">Click para ampliar</div>
         </button>
       @else
         <div class="text-sm text-gray-500 italic">Sin imagen cargada.</div>
       @endif
+
     </section>
 
     {{-- DATOS BÁSICOS --}}
@@ -139,7 +173,7 @@
           </div>
 
           @if(!empty($perfil['TEXTO_FASE_LUNACION']))
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed whitespace-pre-line text-sm">
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed text-sm">
               {{ $perfil['TEXTO_FASE_LUNACION'] }}
             </div>
           @endif
@@ -187,7 +221,7 @@
           </div>
 
           @if(!empty($perfil['TEXTO_SABIANO']))
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed whitespace-pre-line text-sm">
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed text-sm">
               {{ $perfil['TEXTO_SABIANO'] }}
             </div>
           @endif
@@ -218,22 +252,17 @@
     <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold text-lg">Sabianos extra</h2>
-        <span class="text-xs text-gray-500">Historial agregado desde edición</span>
       </div>
 
       @if(!empty($sabianos))
         <div class="space-y-6">
           @foreach($sabianos as $idx => $s)
-            <div class="pt-6 border-t first:border-t-0 first:pt-0">
+            <div class="pt-6 first:border-t-0 first:pt-0">
               <div class="grid md:grid-cols-3 gap-4 items-start">
 
                 {{-- IZQ: texto (igual al principal) --}}
                 <div class="md:col-span-2 space-y-3">
                   <div class="text-sm space-y-1">
-                    <div>
-                      <span class="text-gray-500">Fecha:</span>
-                      <span class="font-medium">{{ $s['FECHA'] ?? '—' }}</span>
-                    </div>
                     <div>
                       <span class="text-gray-500">Signo:</span>
                       <span class="font-medium">{{ $s['SIGNO'] ?? '—' }}</span>
@@ -249,7 +278,7 @@
                   </div>
 
                   @if(!empty($s['TEXTO']))
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed whitespace-pre-line text-sm">
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed text-sm">
                       {{ $s['TEXTO'] }}
                     </div>
                   @endif

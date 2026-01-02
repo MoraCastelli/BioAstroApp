@@ -346,56 +346,6 @@
           </div>
         </div>
 
-        {{-- LISTA DE SABIANOS --}}
-        <div class="pt-6 border-t space-y-3">
-          <h3 class="font-semibold">Sabianos agregados</h3>
-
-          @if(!empty($sabianos))
-            <div class="space-y-3">
-              @foreach($sabianos as $s)
-                <div class="border rounded-xl p-4 bg-gray-50">
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0">
-                      <div class="text-sm">
-                        <span class="text-gray-500">Fecha:</span>
-                        <span class="font-medium">{{ $s['FECHA'] ?? '—' }}</span>
-                      </div>
-                      <div class="text-sm">
-                        <span class="text-gray-500">Signo:</span>
-                        <span class="font-medium">{{ $s['SIGNO'] ?? '—' }}</span>
-                        <span class="text-gray-400 mx-2">·</span>
-                        <span class="text-gray-500">Grado:</span>
-                        <span class="font-medium">{{ $s['GRADO'] ?? '—' }}</span>
-                      </div>
-
-                      <div class="font-semibold mt-1">{{ $s['TITULO'] ?? '' }}</div>
-
-                      @if(!empty($s['TEXTO']))
-                        <div class="mt-2 text-sm text-gray-700 whitespace-pre-line">
-                          {{ $s['TEXTO'] }}
-                        </div>
-                      @endif
-                    </div>
-
-                    <div class="shrink-0 w-32">
-                      @if(!empty($s['IMAGEN']))
-                        <button type="button" class="w-full"
-                                @click="openImg('{{ asset($s['IMAGEN']) }}','Sabiano')">
-                          <img src="{{ asset($s['IMAGEN']) }}"
-                               class="w-full h-24 object-cover rounded-lg border hover:opacity-95 transition">
-                          <div class="text-xs text-gray-500 mt-1 text-center">Click</div>
-                        </button>
-                      @endif
-                    </div>
-                  </div>
-                </div>
-              @endforeach
-            </div>
-          @else
-            <div class="text-sm text-gray-500 italic">Todavía no hay sabianos agregados.</div>
-          @endif
-        </div>
-
         {{-- MODAL: AGREGAR SABIANO --}}
         <div x-show="openSab" x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -445,59 +395,6 @@
           </div>
         </div>
 
-      </section>
-
-      {{-- 7) ENCUENTRO (preguntas) --}}
-      <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
-        <h2 class="font-semibold text-lg">Encuentro (preguntas)</h2>
-
-        <div class="grid md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm text-gray-700">¿Primera vez Astrología?</label>
-            <select wire:model.defer="perfil.PRIMERA_VEZ_ASTROLOGIA" class="w-full border border-gray-300 rounded-lg p-2.5">
-              <option value="">Seleccionar…</option>
-              <option value="SI">Sí</option>
-              <option value="NO">No</option>
-            </select>
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm text-gray-700">Profesión / Ocupación</label>
-            <input type="text" wire:model.defer="perfil.PROFESION" class="w-full border border-gray-300 rounded-lg p-2.5">
-          </div>
-
-          <div>
-            <label class="block text-sm text-gray-700">Vivo con</label>
-            <input type="text" wire:model.defer="perfil.VIVO_CON" class="w-full border border-gray-300 rounded-lg p-2.5">
-          </div>
-
-          <div>
-            <label class="block text-sm text-gray-700">Hogar de la Infancia</label>
-            <input type="text" wire:model.defer="perfil.HOGAR_INFANCIA" class="w-full border border-gray-300 rounded-lg p-2.5">
-          </div>
-
-          <div>
-            <label class="block text-sm text-gray-700">Enfermedades de la Infancia</label>
-            <input type="text" wire:model.defer="perfil.ENF_INFANCIA" class="w-full border border-gray-300 rounded-lg p-2.5">
-          </div>
-
-          <div class="md:col-span-3">
-            <label class="block text-sm text-gray-700">Síntomas actuales</label>
-            <textarea wire:model.defer="perfil.SINTOMAS_ACTUALES" rows="2" class="w-full border border-gray-300 rounded-lg p-2.5"></textarea>
-          </div>
-
-          <div class="md:col-span-3">
-            <label class="block text-sm text-gray-700">Motivo de la Consulta</label>
-            <textarea wire:model.defer="perfil.MOTIVO_CONSULTA" rows="2" class="w-full border border-gray-300 rounded-lg p-2.5"></textarea>
-          </div>
-        </div>
-      </section>
-
-      {{-- 8) DETALLE --}}
-      <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-3">
-        <h2 class="font-semibold text-lg">Detalle del encuentro</h2>
-        <textarea wire:model.defer="perfil.DETALLE_ENCUENTRO_INICIAL" rows="4"
-                  class="w-full border border-gray-300 rounded-lg p-2.5"></textarea>
       </section>
 
       {{-- 9) RESUMEN --}}
