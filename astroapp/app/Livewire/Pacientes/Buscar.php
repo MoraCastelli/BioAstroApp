@@ -29,6 +29,19 @@ class Buscar extends Component
         $this->cargarPacientes();
     }
 
+    public bool $showFiltros = false;
+
+    public function toggleFiltros(): void
+    {
+        $this->showFiltros = !$this->showFiltros;
+    }
+
+    public function closeFiltros(): void
+    {
+        $this->showFiltros = false;
+    }
+
+
     private function cargarPacientes(): void
     {
         $this->error = null;

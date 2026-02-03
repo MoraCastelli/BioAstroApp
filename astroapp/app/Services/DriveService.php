@@ -346,5 +346,26 @@ class DriveService
         );
     }
 
+    public function downloadBytes(string $fileId): array
+    {
+        $meta = GoogleRetry::call(fn() =>
+            $this->drive->files->get($fileId, [
+                'fields' => 'mimeType,name',
+                'supportsAllDrives' => true,
+            ])
+        );
+
+        $res = GoogleRetry::call(fn() =>
+            $this->drive->files->get($fileId, [
+                'alt' => 'media',
+                'supportsAllDrives' => true,
+            ])
+        );
+
+        return [
+            'mime'  => $meta->getMimeType() ?: 'application/octet-stream',
+            'bytes' => $res->getBody()->getContents(),
+        ];
+    }
 
 }

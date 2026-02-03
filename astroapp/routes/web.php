@@ -14,6 +14,10 @@ Route::get('/', function () {
     return view('welcome', ['google_connected' => file_exists($tokenPath)]);
 })->name('home');
 
+Route::get('/media/drive/{fileId}', [PacienteController::class, 'driveImage'])
+  ->name('drive.image');
+
+
 // OAuth
 Route::get('/google/auth', [GoogleAuthController::class, 'redirect'])->name('google.auth');
 Route::get('/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');

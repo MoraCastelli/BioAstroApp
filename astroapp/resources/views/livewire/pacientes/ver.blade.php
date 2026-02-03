@@ -1,3 +1,4 @@
+
 <div class="max-w-6xl mx-auto p-6 space-y-8"
      x-data="{
         imgOpen:false,
@@ -6,19 +7,56 @@
         openImg(src, alt='Imagen'){ this.imgSrc=src; this.imgAlt=alt; this.imgOpen=true; },
      }">
 
-  {{-- MODAL IMAGEN --}}
-  <div x-show="imgOpen" x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-       @keydown.escape.window="imgOpen=false"
-       @click.self="imgOpen=false">
-    <div class="max-w-5xl w-full">
-      <div class="flex justify-end mb-2">
-        <button class="text-white/90 hover:text-white text-sm" @click="imgOpen=false">Cerrar ✕</button>
+{{-- MODAL IMAGEN --}}
+<div
+  x-show="imgOpen"
+  x-cloak
+  x-transition.opacity
+  class="fixed inset-0 z-[9999] backdrop-blur-2xl bg-black/10 bg-black/20"
+  @keydown.escape.window="imgOpen=false"
+  @click.self="imgOpen=false"
+>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+
+    {{-- MARCO BLANCO --}}
+    <div
+      class="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+      style="max-height: 85vh;"
+    >
+
+      {{-- HEADER FIJO --}}
+      <div class="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b bg-white">
+        <div class="text-sm font-medium text-gray-700 truncate"
+             x-text="imgAlt || 'Imagen'"></div>
+
+        <button
+          type="button"
+          class="w-9 h-9 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+          @click="imgOpen=false"
+          aria-label="Cerrar"
+        >
+          ✕
+        </button>
       </div>
-      <img :src="imgSrc" :alt="imgAlt"
-           class="w-full max-h-[80vh] object-contain rounded-xl shadow border border-white/10">
+
+      {{-- CONTENIDO --}}
+      <div
+        class="overflow-auto bg-black"
+        style="max-height: calc(85vh - 56px);"
+      >
+        <img
+          :src="imgSrc"
+          :alt="imgAlt"
+          class="block mx-auto object-contain"
+          style="max-width: 100%; max-height: 70vh;"
+        >
+      </div>
+
     </div>
   </div>
+</div>
+
+
 
   {{-- HEADER --}}
   <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
@@ -46,58 +84,92 @@
   </header>
 
   @php
-    $fotoRaw = $perfil['FOTO_URL'] ?? '';
+    $rawFotoUrl = $perfil['FOTO_URL'] ?? '';
+    $driveFileId = null;
 
-    $foto = $fotoRaw;
+    if ($rawFotoUrl && preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $rawFotoUrl, $m)) $driveFileId = $m[1];
+    if (!$driveFileId && $rawFotoUrl && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $rawFotoUrl, $m)) $driveFileId = $m[1];
 
-    // Si es link de Drive, extraer FILE_ID y convertir a thumbnail
-    if (!empty($fotoRaw) && str_contains($fotoRaw, 'drive.google.com')) {
-        $id = null;
+    $foto = $driveFileId ? route('drive.image', ['fileId' => $driveFileId]) : '';
 
-        // /file/d/{id}/
-        if (preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $fotoRaw, $m)) $id = $m[1];
-
-        // ?id={id}
-        if (!$id && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $fotoRaw, $m)) $id = $m[1];
-
-        if ($id) {
-            $foto = "https://drive.google.com/thumbnail?id={$id}&sz=w1200";
-        }
-    }
-
-    // Si te llega "public/..." normalizalo
-    if (!empty($foto) && str_starts_with($foto, 'public/')) {
-        $foto = asset('storage/'.str_replace('public/', '', $foto));
-    }
-
-    // Si te llega ruta local "pacientes/..."
-    if (!empty($foto) && !str_starts_with($foto, 'http') && !str_starts_with($foto, '/')) {
-        $foto = asset('storage/'.$foto);
-    }
   @endphp
 
   {{-- TOP GRID: FOTO + DATOS --}}
   <div class="grid lg:grid-cols-3 gap-6">
-    {{-- FOTO / CARTA --}}
-    <section class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1 space-y-3">
-      <h2 class="font-semibold text-lg">Carta / Foto</h2>
 
-      @php $foto = $perfil['FOTO_URL'] ?? ''; @endphp
-      @if(!empty($foto))
-        <button type="button" class="w-full text-left"
-                @click="openImg(@js($foto), 'Carta / Foto')">
-          <img src="{{ $foto }}" alt="Carta / Foto"
-              class="w-full h-56 rounded-lg object-cover border hover:opacity-95 transition"
-              loading="lazy"
-              referrerpolicy="no-referrer"
-              onerror="this.style.display='none'">
-          <div class="mt-2 text-xs text-gray-500">Click para ampliar</div>
-        </button>
-      @else
-        <div class="text-sm text-gray-500 italic">Sin imagen cargada.</div>
-      @endif
+    @if(!empty($imagenes))
+      {{-- IMÁGENES DEL PACIENTE --}}
+      <section class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1">
+        <h2 class="font-semibold text-lg mb-3">Imágenes del paciente</h2>
 
-    </section>
+        @php
+          $totalImgs = is_countable($imagenes ?? null) ? count($imagenes) : 0;
+
+          // elegimos la "principal": la primera imagen
+          $first = ($totalImgs > 0) ? $imagenes[0] : null;
+
+          $raw = $first ? (string)($first['URL'] ?? '') : '';
+          $driveId = null;
+
+          if ($raw && preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
+          if (!$driveId && $raw && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
+
+          $url = $driveId ? route('drive.image', ['fileId' => $driveId]) : $raw;
+
+          $nombre = $first['NOMBRE_IMAGEN'] ?? 'Imagen';
+          $desc = $first['DESCRIPCION'] ?? '';
+        @endphp
+
+        <div class="grid md:grid-cols-3 gap-4 items-start">
+          {{-- IZQ: texto --}}
+          <div class="md:col-span-2 space-y-3">
+            <div class="text-sm space-y-1">
+              <div>
+                <span class="text-gray-500">Total:</span>
+                <span class="font-medium">{{ $totalImgs }}</span>
+              </div>
+
+              @if($first)
+                <div>
+                  <span class="text-gray-500">Principal:</span>
+                  <span class="font-medium">{{ $nombre }}</span>
+                </div>
+              @endif
+            </div>
+
+            @if(!empty($desc))
+              <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed text-sm whitespace-pre-line">
+                {{ $desc }}
+              </div>
+            @else
+              <div class="text-sm text-gray-400 italic">Sin descripción.</div>
+            @endif
+          </div>
+
+          {{-- DER: imagen chica --}}
+          <div class="md:col-span-1">
+            @if(!empty($url))
+              <button type="button" class="w-full text-left"
+                      @click="openImg(@js($url), @js($nombre))">
+                <div class="border rounded-xl p-2 bg-gray-50 hover:bg-gray-100 transition">
+                  <img src="{{ $url }}"
+                      class="w-full h-32 object-cover rounded-lg"
+                      alt="{{ $nombre }}"
+                      loading="lazy">
+                  <div class="text-xs text-gray-500 mt-2">Click para ampliar</div>
+                </div>
+              </button>
+            @else
+              <div class="text-sm text-gray-400 italic">Sin imagen</div>
+            @endif
+          </div>
+        </div>
+      </section>
+
+
+
+    @endif
+
 
     {{-- DATOS BÁSICOS --}}
     <section class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-2 space-y-3">
@@ -315,50 +387,6 @@
     </section>
   </div>
 
-  {{-- IMÁGENES DEL PACIENTE (página 3) --}}
-  @if(!empty($imagenes))
-    <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
-      <h2 class="font-semibold text-lg">Imágenes del paciente</h2>
-
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        @foreach($imagenes as $img)
-          @php
-            $raw = (string)($img['URL'] ?? '');
-            $url = $raw;
-
-            if (preg_match('~drive\.google\.com/file/d/([^/]+)~', $raw, $m)) {
-                $url = "https://drive.google.com/uc?export=view&id={$m[1]}";
-            } elseif (preg_match('~drive\.google\.com/open\?id=([^&]+)~', $raw, $m)) {
-                $url = "https://drive.google.com/uc?export=view&id={$m[1]}";
-            }
-          @endphp
-
-          <div class="border rounded-xl p-3 bg-gray-50">
-            <button type="button"
-                    class="w-full text-left"
-                    @click="openImg('{{ $url }}', '{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}')">
-              <img src="{{ $url }}"
-                  class="w-full h-36 object-cover rounded-lg border hover:opacity-95 transition"
-                  alt="{{ $img['NOMBRE_IMAGEN'] ?? 'Imagen' }}"
-                  loading="lazy"
-                  referrerpolicy="no-referrer"
-                  onerror="this.onerror=null; this.src='{{ $url }}'.replace('export=view','export=download');">
-            </button>
-
-            <div class="mt-2">
-              <div class="font-medium text-sm">{{ $img['NOMBRE_IMAGEN'] ?? '—' }}</div>
-              @if(!empty($img['DESCRIPCION']))
-                <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $img['DESCRIPCION'] }}</div>
-              @endif
-              <div class="text-xs text-gray-400 mt-1">Click para ampliar</div>
-            </div>
-          </div>
-        @endforeach
-      </div>
-    </section>
-  @endif
-
-
   {{-- RESUMEN / DETALLE --}}
   <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
     <h2 class="font-semibold text-lg">Resumen y Detalle</h2>
@@ -453,5 +481,4 @@
       </div>
     @endif
   </section>
-
 </div>

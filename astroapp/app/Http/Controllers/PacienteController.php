@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Repositories\PacienteRepository;
 use Illuminate\Http\Request;
+use App\Services\DriveService;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Google\Service\Exception as GoogleServiceException;
 
 class PacienteController extends Controller
 {
+
     public function crear(Request $r)
     {
         dd([
@@ -68,6 +71,22 @@ class PacienteController extends Controller
         catch (\Throwable $e) {
             Log::error('Throwable en crear paciente: '.$e->getMessage());
             return back()->withErrors('Error inesperado al crear el paciente.');
+        }
+    }
+    
+    public function driveImage(string $fileId)
+    {
+        try {
+            $drive = DriveService::make();
+            $data = $drive->downloadBytes($fileId);
+
+            return response($data['bytes'], 200, [
+                'Content-Type'  => $data['mime'],
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('drive.image failed', ['fileId' => $fileId, 'error' => $e->getMessage()]);
+            return response('', 404);
         }
     }
 }

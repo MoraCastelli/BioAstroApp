@@ -20,23 +20,27 @@
       placeholder="Buscar paciente por nombre…">
 
     {{-- Filtros --}}
-    <div class="relative">
-      <button type="button"
-              class="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
-              onclick="document.getElementById('filtros').classList.toggle('hidden')">
-        Filtros ▼
-      </button>
+  <div class="relative" wire:click.outside="closeFiltros">
+    <button type="button"
+            class="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition flex items-center gap-2"
+            wire:click="toggleFiltros">
+      Filtros
+      <span class="text-xs {{ $showFiltros ? 'rotate-180' : '' }} transition">▼</span>
+    </button>
 
-      <div id="filtros"
-           class="hidden absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow p-3 space-y-1 z-10">
-        @foreach($filtrosDisponibles as $campo => $label)
-          <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" wire:model="filtrosSeleccionados" value="{{ $campo }}" class="rounded">
-            {{ $label }}
-          </label>
-        @endforeach
-      </div>
+    <div class="{{ $showFiltros ? '' : 'hidden' }} absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow p-3 space-y-1 z-50">
+      @foreach($filtrosDisponibles as $campo => $label)
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox"
+                wire:model.live="filtrosSeleccionados"
+                value="{{ $campo }}"
+                class="rounded">
+          {{ $label }}
+        </label>
+      @endforeach
     </div>
+  </div>
+
 
     {{-- Crear paciente vacío --}}
     <button wire:click="crearPacienteVacio"
