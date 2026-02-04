@@ -16,25 +16,30 @@ class Ver extends Component
     public array $sabianos = [];
     public array $nuevoSabiano = ['SIGNO'=>'','GRADO'=>''];
     public string $mensaje = '';
+    public bool $ocultarNombres = false;
 
     public function mount($id): void
     {
         $this->id = (string) $id;
 
-        try {
-            $svc = SheetsService::make();
+        $this->ocultarNombres = (bool) session('pacientes.ocultar_nombres', false);
 
+        try {
+            $svc = \App\Services\SheetsService::make();
             $this->perfil = $svc->getPerfil($this->id);
             $this->encuentros = $svc->readEncuentros($this->id);
-
             $this->sabianos = $svc->readSabianos($this->id);
-
-            $this->imagenes = method_exists($svc, 'readImagenes')
-                ? $svc->readImagenes($this->id)
-                : [];
+            $this->imagenes = method_exists($svc, 'readImagenes') ? $svc->readImagenes($this->id) : [];
         } catch (\Throwable $e) {
             $this->error = $e->getMessage();
         }
+    }
+
+    public function toggleNombre(): void
+    {
+        $this->ocultarNombres = !$this->ocultarNombres;
+
+        session(['pacientes.ocultar_nombres' => $this->ocultarNombres]);
     }
 
     public function render()

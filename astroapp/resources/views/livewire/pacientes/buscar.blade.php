@@ -54,14 +54,32 @@
 
   {{-- Lista --}}
   <section class="space-y-3">
-    <h2 class="text-sm font-medium text-gray-700 uppercase tracking-wider">Lista de pacientes</h2>
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-medium text-gray-700 uppercase tracking-wider">
+        Lista de pacientes
+      </h2>
+
+      <button
+        wire:click="toggleNombres"
+        class="text-xs px-3 py-1.5 rounded-md border transition
+              {{ $ocultarNombres
+                      ? 'bg-gray-800 text-black border-gray-800'
+                      : 'bg-gray-500 text-black border-gray-500 hover:bg-gray-600'
+              }}">
+        {{ $ocultarNombres ? 'Mostrar nombres' : 'Ocultar nombres' }}
+      </button>
+    </div>
+
 
     <div class="bg-white rounded-xl shadow border border-gray-100 divide-y">
       @forelse($items as $it)
         <div class="flex items-center justify-between p-4 hover:bg-gray-50 transition">
           {{-- Info principal --}}
           <div>
-            <div class="font-medium text-gray-900">{{ $it['nombre'] ?? 'Paciente' }}</div>
+            <div class="text-lg font-bold text-gray-900">
+              {{ $ocultarNombres ? '**********' : ($it['nombre'] ?? 'Paciente') }}
+            </div>
+
             <div class="text-xs text-gray-500">
               @php
                 $signo = $it['signo'] ?? '';
@@ -77,6 +95,26 @@
                 <span class="italic text-gray-400">Sin datos aún</span>
               @endif
             </div>
+
+            {{-- BADGES: “aparece por estos filtros” --}}
+            @if(!empty($filtrosSeleccionados))
+              @php
+                $match = $matchMap[$it['id']] ?? [];
+              @endphp
+
+              <div class="mt-2 flex flex-wrap gap-1">
+                @foreach($match as $campo)
+                  <span
+                    class="inline-flex items-center
+                          px-2 py-1
+                          text-xs font-medium
+                          rounded-md
+                          bg-emerald-600 text-white">
+                    {{ $filtrosDisponibles[$campo] ?? $campo }}
+                  </span>
+                @endforeach
+              </div>
+            @endif
           </div>
 
           {{-- Acciones (ver / editar / agregar encuentro / eliminar) --}}

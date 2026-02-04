@@ -13,7 +13,8 @@ class Buscar extends Component
     public array $items = [];
     public array $todos = [];
     public array $filtrosSeleccionados = [];
-
+    public array $matchMap = [];
+    public bool $ocultarNombres = false;
     public ?string $error = null;
 
     public array $filtrosDisponibles = [
@@ -24,8 +25,17 @@ class Buscar extends Component
         'FILTRO_ENFERMEDAD' => 'Enfermedad',
     ];
 
+
+    public function toggleNombres(): void
+    {
+        $this->ocultarNombres = !$this->ocultarNombres;
+        session(['pacientes.ocultar_nombres' => $this->ocultarNombres]);
+    }
+
+
     public function mount(): void
     {
+        $this->ocultarNombres = (bool) session('pacientes.ocultar_nombres', false);
         $this->cargarPacientes();
     }
 
@@ -90,7 +100,7 @@ class Buscar extends Component
 
                     // Filtros marcados como "SI"
                     foreach ($this->filtrosDisponibles as $campo => $label) {
-                        if (($perfil[$campo] ?? '') === 'SI') {
+                        if ($this->truthy($perfil[$campo] ?? null)) {
                             $fila['filtros'][] = $campo;
                         }
                     }
@@ -115,6 +125,18 @@ class Buscar extends Component
         }
     }
 
+    private function truthy($v): bool
+    {
+        if (is_bool($v)) return $v;
+        if (is_int($v)) return $v === 1;
+
+        $s = mb_strtolower(trim((string)$v));
+
+        return in_array($s, [
+            '1', 'true', 'si', 'sí', 'verdadero', 'x', 'ok', 'yes'
+        ], true);
+    }
+
 
     public function updatedQ(): void
     {
@@ -129,23 +151,32 @@ class Buscar extends Component
     private function filtrarPacientes(): void
     {
         $q = $this->normalize($this->q);
-        $filtros = $this->filtrosSeleccionados;
+        $sel = $this->filtrosSeleccionados;
 
-        $this->items = array_values(array_filter($this->todos, function ($r) use ($q, $filtros) {
-            // Seguridad: si no hay id, no lo mostramos
+        $this->matchMap = [];
+
+        $this->items = array_values(array_filter($this->todos, function ($r) use ($q, $sel) {
             if (empty($r['id'])) return false;
 
             $nombre = $this->normalize($r['nombre'] ?? '');
-            $coincideNombre = ($q === '' || str_contains($nombre, $q));
-            if (!$coincideNombre) return false;
+            if ($q !== '' && !str_contains($nombre, $q)) return false;
 
-            if (empty($filtros)) return true;
+            // si no hay filtros seleccionados -> pasa y no marca match
+            if (empty($sel)) {
+                $this->matchMap[$r['id']] = [];
+                return true;
+            }
 
-            // Como ya guardamos filtros en $r['filtros'], filtramos sin ir a Sheets
             $tiene = $r['filtros'] ?? [];
-            return count(array_intersect($filtros, $tiene)) > 0;
+            $match = array_values(array_intersect($sel, $tiene));
+
+            $this->matchMap[$r['id']] = $match;
+
+            // OR (como hoy): con que coincida uno, entra
+            return count($match) > 0;
         }));
     }
+
 
 
     public function crearPacienteVacio()

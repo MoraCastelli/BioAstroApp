@@ -57,31 +57,53 @@
 </div>
 
 
-
   {{-- HEADER --}}
-  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-    <div>
-      <h1 class="text-3xl font-semibold tracking-tight">
-        {{ $perfil['NOMBRE_Y_APELLIDO'] ?? 'Paciente' }}
-      </h1>
-      <p class="text-sm text-gray-600">Vista del perfil astrológico</p>
-    </div>
+  <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
-    <div class="flex flex-wrap gap-2">
+    {{-- IZQUIERDA: nombre + ocultar --}}
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+      @php
+        $nombreReal = $perfil['NOMBRE_Y_APELLIDO'] ?? 'Paciente';
+        $nombreOculto = str_repeat('*', max(10, mb_strlen($nombreReal)));
+      @endphp
+
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <h1 class="text-3xl font-black tracking-tight">
+          {{ $ocultarNombres ? $nombreOculto : $nombreReal }}
+        </h1>
+
+        {{-- botón chico --}}
+        <button
+          wire:click="toggleNombre"
+          type="button"
+          class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold
+                border border-gray-300 text-gray-600 bg-white
+                hover:bg-gray-100 transition whitespace-nowrap">
+          {{ $ocultarNombres ? 'Ver nombre' : 'Ocultar nombre' }}
+        </button>
+      </div>
+
+
+    {{-- DERECHA: acciones --}}
+    <div class="flex flex-wrap gap-2 justify-end">
       <a href="{{ route('paciente.editar', $id) }}"
-         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
         Editar
       </a>
+
       <a href="{{ route('paciente.nuevo-encuentro', $id) }}"
-         class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition">
+        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition">
         + Agregar encuentro
       </a>
+
       <a href="{{ route('buscar') }}"
-         class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition">
+        class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition">
         Volver
       </a>
     </div>
   </header>
+
+
 
   @php
     $rawFotoUrl = $perfil['FOTO_URL'] ?? '';

@@ -24,12 +24,6 @@ class PacienteController extends Controller
         abort_if($nombre === '', 400, 'Nombre requerido');
 
         try {
-            // El repo se encarga de:
-            // - carpeta paciente + subcarpeta Imagenes
-            // - copiar template dentro de la carpeta
-            // - seed/ensure sheets
-            // - setPerfil inicial
-            // - updateIndice (incluyendo folder ids)
             $repo = PacienteRepository::make();
             $id   = $repo->crearDesdeTemplate($nombre);
 
