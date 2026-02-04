@@ -82,7 +82,7 @@
 
             <div class="text-xs text-gray-500">
               @php
-                $signo = $it['signo'] ?? '';
+                $signo = $it['SIGNO_SOLAR'] ?? '';
                 $edad  = $it['edad'] ?? '';
                 $edad2 = $edad !== '' ? str_pad((string)$edad, 2, '0', STR_PAD_LEFT) : '';
               @endphp

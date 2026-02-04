@@ -102,7 +102,15 @@ class Editar extends Component
             'FILTRO_ADOPTADO' => '',
             'FILTRO_ABUSOS' => '',
             'FILTRO_SUICIDIO' => '',
-            'FILTRO_ENFERMEDAD' => '',
+            'FILTRO_SALUD' => '',
+            'FILTRO_TEA' => '',
+            'FILTRO_HISTORICOS' => '',
+            'FILTRO_FILOSOFOS' => '',
+            'FILTRO_PAISES' => '',
+            'FILTRO_ECLIPSES' => '',
+            'FILTRO_ANUALES' => '',
+            'FILTRO_MOMENTOS_CRITICOS' => '',
+            'FILTRO_INICIO_CICLOS' => '',
 
             'SIGNO_SOL' => '',
             'GRADO_SOL' => '',
@@ -143,12 +151,26 @@ class Editar extends Component
         ];
 
         $this->perfil = array_merge($defaults, $perfil);
-        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
-            $v = $this->perfil[$k] ?? '';
-            $v = is_string($v) ? strtoupper(trim($v)) : $v;
+        foreach ([
+        'FILTRO_MELLIZOS',
+        'FILTRO_ADOPTADO',
+        'FILTRO_ABUSOS',
+        'FILTRO_SUICIDIO',
+        'FILTRO_SALUD',
+        'FILTRO_TEA',
+        'FILTRO_HISTORICOS',
+        'FILTRO_FILOSOFOS',
+        'FILTRO_PAISES',
+        'FILTRO_ECLIPSES',
+        'FILTRO_ANUALES',
+        'FILTRO_MOMENTOS_CRITICOS',
+        'FILTRO_INICIO_CICLOS',
+        ] as $k) {
 
-            // acepta SI / TRUE / 1 / ON / X
-            $this->perfil[$k] = in_array($v, ['SI','TRUE','1','ON','X'], true);
+        $v = $this->perfil[$k] ?? '';
+        $v = is_string($v) ? strtoupper(trim($v)) : $v;
+
+        $this->perfil[$k] = in_array($v, ['SI','TRUE','1','ON','X'], true);
         }
 
         // Calcs iniciales
@@ -434,7 +456,7 @@ class Editar extends Component
     }
 
     /**
-     * ✅ SIEMPRE usa la carpeta padre REAL del spreadsheet.
+     * SIEMPRE usa la carpeta padre REAL del spreadsheet.
      * Así no te separa "Morita" vs "Paciente sin nombre".
      */
     private function getPacienteImagesFolderId(): string
@@ -452,7 +474,7 @@ class Editar extends Component
 
     public function guardar()
     {
-        // ✅ corregido: antes tenías $this->validate();q
+        // corregido: antes tenías $this->validate();q
         $this->validate();
 
         $nuevoNombre = trim((string)($this->perfil['NOMBRE_Y_APELLIDO'] ?? ''));
@@ -472,14 +494,24 @@ class Editar extends Component
             $this->nombreOriginal = $nuevoNombre;
         }
 
-        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
-            $this->perfil[$k] = !empty($this->perfil[$k]) ? 'SI' : '';
+        foreach ([
+        'FILTRO_MELLIZOS',
+        'FILTRO_ADOPTADO',
+        'FILTRO_ABUSOS',
+        'FILTRO_SUICIDIO',
+        'FILTRO_SALUD',
+        'FILTRO_TEA',
+        'FILTRO_HISTORICOS',
+        'FILTRO_FILOSOFOS',
+        'FILTRO_PAISES',
+        'FILTRO_ECLIPSES',
+        'FILTRO_ANUALES',
+        'FILTRO_MOMENTOS_CRITICOS',
+        'FILTRO_INICIO_CICLOS',
+        ] as $k) {
+        $this->perfil[$k] = !empty($this->perfil[$k]) ? 'SI' : '';
         }
 
-
-        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
-            $this->perfil[$k] = !empty($this->perfil[$k]) ? 'SI' : '';
-        }
 
         SheetsService::make()->setPerfil($this->id, $this->perfil);
 

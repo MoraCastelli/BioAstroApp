@@ -282,14 +282,48 @@
       {{-- 4) FILTROS --}}
       <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
         <h2 class="font-semibold text-lg">Filtros</h2>
-        <div class="grid md:grid-cols-3 gap-4 text-sm">
-          <label class="flex items-center gap-2"><input type="checkbox" wire:model.defer="perfil.FILTRO_MELLIZOS"> Mellizos</label>
-          <label class="flex items-center gap-2"><input type="checkbox" wire:model.defer="perfil.FILTRO_ADOPTADO"> Adoptado</label>
-          <label class="flex items-center gap-2"><input type="checkbox" wire:model.defer="perfil.FILTRO_ABUSOS"> Abusos</label>
-          <label class="flex items-center gap-2"><input type="checkbox" wire:model.defer="perfil.FILTRO_SUICIDIO"> Suicidio</label>
-          <label class="flex items-center gap-2"><input type="checkbox" wire:model.defer="perfil.FILTRO_ENFERMEDAD"> Enfermedad</label>
+
+        <div class="grid md:grid-cols-3 gap-3 text-sm">
+
+          @php
+            $filtros = [
+              'FILTRO_MELLIZOS'         => 'Mellizos',
+              'FILTRO_ADOPTADO'         => 'Adoptado',
+              'FILTRO_ABUSOS'           => 'Abusos',
+              'FILTRO_SUICIDIO'         => 'Suicidio',
+              'FILTRO_SALUD'            => 'Salud',
+              'FILTRO_TEA'              => 'TEA',
+              'FILTRO_HISTORICOS'       => 'Históricos',
+              'FILTRO_FILOSOFOS'        => 'Filósofos',
+              'FILTRO_PAISES'           => 'Países',
+              'FILTRO_ECLIPSES'         => 'Eclipses',
+              'FILTRO_ANUALES'          => 'Anuales',
+              'FILTRO_MOMENTOS_CRITICOS'=> 'Momentos críticos',
+              'FILTRO_INICIO_CICLOS'    => 'Inicio de ciclos',
+            ];
+          @endphp
+
+          @foreach($filtros as $campo => $label)
+            <label
+              for="{{ $campo }}"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200
+                    bg-gray-50 hover:bg-gray-100 cursor-pointer transition"
+            >
+              <input
+                id="{{ $campo }}"
+                type="checkbox"
+                wire:model.defer="perfil.{{ $campo }}"
+                class="w-4 h-4 rounded border-gray-300
+                      text-emerald-600
+                      focus:ring-emerald-500 focus:ring-2"
+              >
+              <span class="text-gray-700">{{ $label }}</span>
+            </label>
+          @endforeach
+
         </div>
       </section>
+
 
       {{-- 5) LECTURA --}}
       <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">

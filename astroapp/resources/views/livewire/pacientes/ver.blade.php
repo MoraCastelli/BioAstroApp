@@ -9,6 +9,14 @@
 
       setGallery(list){ this.gallery = list || []; },
 
+      openImg(src, alt='Imagen'){
+        // abre el modal con una imagen suelta (fase/sabiano/etc)
+        this.imgIndex = -1; // “no pertenece a la galería”
+        this.imgSrc = src || '';
+        this.imgAlt = alt || 'Imagen';
+        this.imgOpen = true;
+      },
+
       openAt(i){
         this.imgIndex = i;
         const it = this.gallery[i] || {};
@@ -17,15 +25,6 @@
         this.imgOpen = true;
       },
 
-      prev(){
-        if(!this.gallery.length) return;
-        this.openAt((this.imgIndex - 1 + this.gallery.length) % this.gallery.length);
-      },
-
-      next(){
-        if(!this.gallery.length) return;
-        this.openAt((this.imgIndex + 1) % this.gallery.length);
-      },
     }">
 
 {{-- MODAL IMAGEN --}}
@@ -35,8 +34,6 @@
   x-transition.opacity
   class="fixed inset-0 z-[9999] backdrop-blur-2xl bg-black/10 bg-black/20"
   @keydown.escape.window="imgOpen=false"
-  @keydown.arrow-left.window="if(imgOpen) prev()"
-  @keydown.arrow-right.window="if(imgOpen) next()"
   @click.self="imgOpen=false"
 >
   <div class="absolute inset-0 flex items-center justify-center p-4">
@@ -64,40 +61,6 @@
 
       {{-- CONTENIDO --}}
       <div class="relative bg-black" style="max-height: calc(85vh - 56px);">
-
-        {{-- Flecha izquierda --}}
-        <button type="button"
-          x-show="gallery.length > 1"
-          @click.stop="prev()"
-          class="absolute left-4 top-1/2 -translate-y-1/2 z-30
-                w-11 h-11 rounded-full
-                bg-white/70 backdrop-blur border border-white/40
-                shadow-lg shadow-black/20
-                flex items-center justify-center
-                text-gray-800 hover:bg-white/90
-                transition"
-          aria-label="Anterior">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-          </svg>
-        </button>
-
-        {{-- Flecha derecha --}}
-        <button type="button"
-          x-show="gallery.length > 1"
-          @click.stop="next()"
-          class="absolute right-4 top-1/2 -translate-y-1/2 z-30
-                w-11 h-11 rounded-full
-                bg-white/70 backdrop-blur border border-white/40
-                shadow-lg shadow-black/20
-                flex items-center justify-center
-                text-gray-800 hover:bg-white/90
-                transition"
-          aria-label="Siguiente">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-          </svg>
-        </button>
 
         {{-- Imagen --}}
         <div class="grid place-items-center p-4" style="max-height: calc(85vh - 56px);">
@@ -199,80 +162,114 @@
     $totalImgs = count($gallery);
   @endphp
 
-  <section
-    class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1"
-    x-data="{
-      idx: 0,
-      items: @js($gallery),
-      select(i){ this.idx=i; },
-      current(){ return this.items[this.idx] || {title:'Imagen', desc:'', url:''}; }
-    }"
-    x-init="setGallery(items)"
-  >
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-lg">Imágenes del paciente</h2>
-      <div class="text-xs text-gray-500">
-        Total: <span class="font-medium text-gray-800">{{ $totalImgs }}</span>
-      </div>
-    </div>
+  <section class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1"
+          x-init="setGallery(@js($gallery))">
 
-    {{-- Layout: grilla miniaturas + detalle --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-lg">Imágenes del paciente</h2>
+        <div class="text-xs text-gray-500">
+          Total: <span class="font-medium text-gray-800">{{ $totalImgs }}</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
       {{-- GRILLA MINIATURAS --}}
       <div class="grid grid-cols-4 gap-2 content-start">
-        <template x-for="(g, i) in items" :key="i">
+        <template x-for="(g, i) in gallery" :key="i">
           <button type="button"
-            @click="select(i)"
+            @click.stop="openAt(i)"
             class="group rounded-lg border overflow-hidden bg-gray-50 hover:bg-gray-100 transition"
-            :class="idx===i ? 'ring-2 ring-emerald-500/60 border-emerald-200' : 'border-gray-200'"
+            :class="imgIndex===i ? 'ring-2 ring-emerald-500/60 border-emerald-200' : 'border-gray-200'"
             :title="g.title"
           >
-            <img
-              :src="g.url"
-              :alt="g.title"
-              class="w-24 h-20 object-cover block"  {{-- <<< MINI REAL --}}
-              loading="lazy"
-            >
+            <img :src="g.url"
+                :alt="g.title"
+                class="w-full aspect-square object-cover block"
+                loading="lazy">
           </button>
         </template>
       </div>
 
-      {{-- DETALLE AL COSTADO --}}
+      {{-- DETALLE (del seleccionado) --}}
       <div class="space-y-3">
         <div class="text-sm">
           <div class="text-gray-500">Título</div>
-          <div class="font-semibold text-gray-800" x-text="current().title"></div>
+          <div class="font-semibold text-gray-800" x-text="(gallery[imgIndex]?.title) || 'Imagen'"></div>
         </div>
 
         <div>
           <div class="text-gray-500 text-sm mb-1">Descripción</div>
 
-          <template x-if="(current().desc || '').trim() !== ''">
+          <template x-if="((gallery[imgIndex]?.desc)||'').trim() !== ''">
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 leading-relaxed text-sm whitespace-pre-line"
-                 x-text="current().desc"></div>
+                x-text="gallery[imgIndex].desc"></div>
           </template>
 
-          <template x-if="(current().desc || '').trim() === ''">
+          <template x-if="((gallery[imgIndex]?.desc)||'').trim() === ''">
             <div class="text-sm text-gray-400 italic">Sin descripción.</div>
           </template>
         </div>
 
-        {{-- BOTÓN ABRIR MODAL --}}
-        <button type="button"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm"
-          @click="openAt(idx)"
-        >
-          Ver grande
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6M10 14L21 3M9 3H3v6M14 10L3 21M15 21h6v-6M3 21h6v-6"/>
-          </svg>
-        </button>
+        <div class="text-xs text-gray-400">
+          Click en una miniatura para ver grande.
+        </div>
       </div>
+
     </div>
+
   </section>
 @endif
 
+{{-- FILTROS (solo lectura) --}}
+@php
+  $filtrosMap = [
+    'FILTRO_MELLIZOS'          => 'Mellizos',
+    'FILTRO_ADOPTADO'          => 'Adoptado',
+    'FILTRO_ABUSOS'            => 'Abusos',
+    'FILTRO_SUICIDIO'          => 'Suicidio',
+    'FILTRO_SALUD'             => 'Salud',
+    'FILTRO_TEA'               => 'TEA',
+    'FILTRO_HISTORICOS'        => 'Históricos',
+    'FILTRO_FILOSOFOS'         => 'Filósofos',
+    'FILTRO_PAISES'            => 'Países',
+    'FILTRO_ECLIPSES'          => 'Eclipses',
+    'FILTRO_ANUALES'           => 'Anuales',
+    'FILTRO_MOMENTOS_CRITICOS' => 'Momentos críticos',
+    'FILTRO_INICIO_CICLOS'     => 'Inicio de ciclos',
+  ];
+
+  $activos = [];
+  foreach ($filtrosMap as $k => $label) {
+    $v = $perfil[$k] ?? '';
+    $v = is_string($v) ? strtoupper(trim($v)) : $v;
+
+    // considera “verdadero” si viene como SI / TRUE / 1 / ON / X o boolean true
+    $isTrue = ($v === true) || in_array($v, ['SI','TRUE','1','ON','X'], true);
+    if ($isTrue) $activos[] = $label;
+  }
+@endphp
+
+<section class="bg-white p-5 rounded-xl bg-gray-100 shadow space-y-3">
+  <div class="flex items-center justify-between">
+    <h2 class="font-semibold text-lg">Filtros</h2>
+  </div>
+
+  @if(!empty($activos))
+    <div class="flex flex-wrap gap-2">
+      @foreach($activos as $tag)
+        <span class="inline-flex items-center px-2.5 py-1 text-[10px]
+                     bg-slate-900 bg-gray-100 text-black">
+          {{ $tag }}
+        </span>
+      @endforeach
+    </div>
+  @else
+    <div class="text-sm text-gray-400 italic">
+      Sin filtros seleccionados.
+    </div>
+  @endif
+</section>
 
 
     {{-- DATOS BÁSICOS --}}
