@@ -1,11 +1,32 @@
 
 <div class="max-w-6xl mx-auto p-6 space-y-8"
-     x-data="{
-        imgOpen:false,
-        imgSrc:'',
-        imgAlt:'',
-        openImg(src, alt='Imagen'){ this.imgSrc=src; this.imgAlt=alt; this.imgOpen=true; },
-     }">
+    x-data="{
+      imgOpen:false,
+      imgSrc:'',
+      imgAlt:'',
+      imgIndex: 0,
+      gallery: [],
+
+      setGallery(list){ this.gallery = list || []; },
+
+      openAt(i){
+        this.imgIndex = i;
+        const it = this.gallery[i] || {};
+        this.imgSrc = it.url || '';
+        this.imgAlt = it.title || 'Imagen';
+        this.imgOpen = true;
+      },
+
+      prev(){
+        if(!this.gallery.length) return;
+        this.openAt((this.imgIndex - 1 + this.gallery.length) % this.gallery.length);
+      },
+
+      next(){
+        if(!this.gallery.length) return;
+        this.openAt((this.imgIndex + 1) % this.gallery.length);
+      },
+    }">
 
 {{-- MODAL IMAGEN --}}
 <div
@@ -14,6 +35,8 @@
   x-transition.opacity
   class="fixed inset-0 z-[9999] backdrop-blur-2xl bg-black/10 bg-black/20"
   @keydown.escape.window="imgOpen=false"
+  @keydown.arrow-left.window="if(imgOpen) prev()"
+  @keydown.arrow-right.window="if(imgOpen) next()"
   @click.self="imgOpen=false"
 >
   <div class="absolute inset-0 flex items-center justify-center p-4">
@@ -40,16 +63,52 @@
       </div>
 
       {{-- CONTENIDO --}}
-      <div
-        class="overflow-auto bg-black"
-        style="max-height: calc(85vh - 56px);"
-      >
-        <img
-          :src="imgSrc"
-          :alt="imgAlt"
-          class="block mx-auto object-contain"
-          style="max-width: 100%; max-height: 70vh;"
-        >
+      <div class="relative bg-black" style="max-height: calc(85vh - 56px);">
+
+        {{-- Flecha izquierda --}}
+        <button type="button"
+          x-show="gallery.length > 1"
+          @click.stop="prev()"
+          class="absolute left-4 top-1/2 -translate-y-1/2 z-30
+                w-11 h-11 rounded-full
+                bg-white/70 backdrop-blur border border-white/40
+                shadow-lg shadow-black/20
+                flex items-center justify-center
+                text-gray-800 hover:bg-white/90
+                transition"
+          aria-label="Anterior">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        {{-- Flecha derecha --}}
+        <button type="button"
+          x-show="gallery.length > 1"
+          @click.stop="next()"
+          class="absolute right-4 top-1/2 -translate-y-1/2 z-30
+                w-11 h-11 rounded-full
+                bg-white/70 backdrop-blur border border-white/40
+                shadow-lg shadow-black/20
+                flex items-center justify-center
+                text-gray-800 hover:bg-white/90
+                transition"
+          aria-label="Siguiente">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+
+        {{-- Imagen --}}
+        <div class="grid place-items-center p-4" style="max-height: calc(85vh - 56px);">
+          <img
+            :src="imgSrc"
+            :alt="imgAlt"
+            class="max-w-full object-contain"
+            style="max-height: 70vh;"
+          >
+        </div>
+
       </div>
 
     </div>
@@ -119,78 +178,101 @@
   {{-- TOP GRID: FOTO + DATOS --}}
   <div class="grid lg:grid-cols-3 gap-6">
 
-    @if(!empty($imagenes))
-      {{-- IMÁGENES DEL PACIENTE --}}
-      <section class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1">
-        <h2 class="font-semibold text-lg mb-3">Imágenes del paciente</h2>
+   @if(!empty($imagenes))
+  @php
+    $gallery = [];
+    foreach ($imagenes as $img) {
+      $raw = (string)($img['URL'] ?? '');
+      $driveId = null;
 
-        @php
-          $totalImgs = is_countable($imagenes ?? null) ? count($imagenes) : 0;
+      if ($raw && preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
+      if (!$driveId && $raw && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
 
-          // elegimos la "principal": la primera imagen
-          $first = ($totalImgs > 0) ? $imagenes[0] : null;
+      $url = $driveId ? route('drive.image', ['fileId' => $driveId]) : $raw;
 
-          $raw = $first ? (string)($first['URL'] ?? '') : '';
-          $driveId = null;
+      $gallery[] = [
+        'url'   => $url,
+        'title' => $img['NOMBRE_IMAGEN'] ?? 'Imagen',
+        'desc'  => $img['DESCRIPCION'] ?? '',
+      ];
+    }
+    $totalImgs = count($gallery);
+  @endphp
 
-          if ($raw && preg_match('~/file/d/([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
-          if (!$driveId && $raw && preg_match('~[?&]id=([a-zA-Z0-9_-]+)~', $raw, $m)) $driveId = $m[1];
+  <section
+    class="bg-white p-5 rounded-xl shadow border border-gray-100 lg:col-span-1"
+    x-data="{
+      idx: 0,
+      items: @js($gallery),
+      select(i){ this.idx=i; },
+      current(){ return this.items[this.idx] || {title:'Imagen', desc:'', url:''}; }
+    }"
+    x-init="setGallery(items)"
+  >
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-lg">Imágenes del paciente</h2>
+      <div class="text-xs text-gray-500">
+        Total: <span class="font-medium text-gray-800">{{ $totalImgs }}</span>
+      </div>
+    </div>
 
-          $url = $driveId ? route('drive.image', ['fileId' => $driveId]) : $raw;
+    {{-- Layout: grilla miniaturas + detalle --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          $nombre = $first['NOMBRE_IMAGEN'] ?? 'Imagen';
-          $desc = $first['DESCRIPCION'] ?? '';
-        @endphp
+      {{-- GRILLA MINIATURAS --}}
+      <div class="grid grid-cols-4 gap-2 content-start">
+        <template x-for="(g, i) in items" :key="i">
+          <button type="button"
+            @click="select(i)"
+            class="group rounded-lg border overflow-hidden bg-gray-50 hover:bg-gray-100 transition"
+            :class="idx===i ? 'ring-2 ring-emerald-500/60 border-emerald-200' : 'border-gray-200'"
+            :title="g.title"
+          >
+            <img
+              :src="g.url"
+              :alt="g.title"
+              class="w-24 h-20 object-cover block"  {{-- <<< MINI REAL --}}
+              loading="lazy"
+            >
+          </button>
+        </template>
+      </div>
 
-        <div class="grid md:grid-cols-3 gap-4 items-start">
-          {{-- IZQ: texto --}}
-          <div class="md:col-span-2 space-y-3">
-            <div class="text-sm space-y-1">
-              <div>
-                <span class="text-gray-500">Total:</span>
-                <span class="font-medium">{{ $totalImgs }}</span>
-              </div>
-
-              @if($first)
-                <div>
-                  <span class="text-gray-500">Principal:</span>
-                  <span class="font-medium">{{ $nombre }}</span>
-                </div>
-              @endif
-            </div>
-
-            @if(!empty($desc))
-              <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 leading-relaxed text-sm whitespace-pre-line">
-                {{ $desc }}
-              </div>
-            @else
-              <div class="text-sm text-gray-400 italic">Sin descripción.</div>
-            @endif
-          </div>
-
-          {{-- DER: imagen chica --}}
-          <div class="md:col-span-1">
-            @if(!empty($url))
-              <button type="button" class="w-full text-left"
-                      @click="openImg(@js($url), @js($nombre))">
-                <div class="border rounded-xl p-2 bg-gray-50 hover:bg-gray-100 transition">
-                  <img src="{{ $url }}"
-                      class="w-full h-32 object-cover rounded-lg"
-                      alt="{{ $nombre }}"
-                      loading="lazy">
-                  <div class="text-xs text-gray-500 mt-2">Click para ampliar</div>
-                </div>
-              </button>
-            @else
-              <div class="text-sm text-gray-400 italic">Sin imagen</div>
-            @endif
-          </div>
+      {{-- DETALLE AL COSTADO --}}
+      <div class="space-y-3">
+        <div class="text-sm">
+          <div class="text-gray-500">Título</div>
+          <div class="font-semibold text-gray-800" x-text="current().title"></div>
         </div>
-      </section>
 
+        <div>
+          <div class="text-gray-500 text-sm mb-1">Descripción</div>
 
+          <template x-if="(current().desc || '').trim() !== ''">
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 leading-relaxed text-sm whitespace-pre-line"
+                 x-text="current().desc"></div>
+          </template>
 
-    @endif
+          <template x-if="(current().desc || '').trim() === ''">
+            <div class="text-sm text-gray-400 italic">Sin descripción.</div>
+          </template>
+        </div>
+
+        {{-- BOTÓN ABRIR MODAL --}}
+        <button type="button"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm"
+          @click="openAt(idx)"
+        >
+          Ver grande
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6M10 14L21 3M9 3H3v6M14 10L3 21M15 21h6v-6M3 21h6v-6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+@endif
+
 
 
     {{-- DATOS BÁSICOS --}}

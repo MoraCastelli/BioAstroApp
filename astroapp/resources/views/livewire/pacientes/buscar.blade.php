@@ -63,8 +63,8 @@
         wire:click="toggleNombres"
         class="text-xs px-3 py-1.5 rounded-md border transition
               {{ $ocultarNombres
-                      ? 'bg-gray-800 text-black border-gray-800'
-                      : 'bg-gray-500 text-black border-gray-500 hover:bg-gray-600'
+                      ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
               }}">
         {{ $ocultarNombres ? 'Mostrar nombres' : 'Ocultar nombres' }}
       </button>

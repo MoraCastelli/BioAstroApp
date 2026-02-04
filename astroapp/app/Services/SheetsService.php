@@ -358,6 +358,96 @@ class SheetsService
         ], $values), fn($row) => trim((string)$row['URL']) !== ''));
     }
 
+    public function readImagenesWithRows(string $spreadsheetId): array
+    {
+        $this->ensureImagenes($spreadsheetId);
+
+        $resp = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Imagenes!A2:C100000')
+        );
+
+        $values = $resp->getValues() ?? [];
+
+        $out = [];
+        foreach ($values as $i => $r) {
+            $url = trim((string)($r[1] ?? ''));
+            if ($url === '') continue;
+
+            $out[] = [
+                'row'           => 2 + $i, // fila real
+                'NOMBRE_IMAGEN' => $r[0] ?? '',
+                'URL'           => $r[1] ?? '',
+                'DESCRIPCION'   => $r[2] ?? '',
+            ];
+        }
+
+        return $out;
+    }
+
+    public function deleteImagenRow(string $spreadsheetId, int $row): void
+    {
+        $this->ensureImagenes($spreadsheetId);
+
+        // necesitamos el sheetId numérico de "Imagenes"
+        $ss = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->get($spreadsheetId, [
+                'fields' => 'sheets(properties(sheetId,title))'
+            ])
+        );
+
+        $sheetId = null;
+        foreach (($ss->getSheets() ?? []) as $s) {
+            if (($s->getProperties()->getTitle() ?? '') === 'Imagenes') {
+                $sheetId = $s->getProperties()->getSheetId();
+                break;
+            }
+        }
+        if ($sheetId === null) return;
+
+        // row en API es 0-based y endRowIndex es exclusivo
+        $start = max(0, $row - 1);
+        $end   = $start + 1;
+
+        $requests = [
+            new \Google\Service\Sheets\Request([
+                'deleteDimension' => [
+                    'range' => [
+                        'sheetId' => $sheetId,
+                        'dimension' => 'ROWS',
+                        'startIndex' => $start,
+                        'endIndex' => $end,
+                    ],
+                ],
+            ]),
+        ];
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            )
+        );
+    }
+
+
+
+    public function updateImagenDescripcion(string $spreadsheetId, int $row, string $descripcion): void
+    {
+        $this->ensureImagenes($spreadsheetId);
+
+        $body = new \Google\Service\Sheets\ValueRange([
+            'values' => [[ $descripcion ]]
+        ]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                "Imagenes!C{$row}",
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
 
     public function renameSpreadsheet(string $spreadsheetId, string $newTitle): void
     {

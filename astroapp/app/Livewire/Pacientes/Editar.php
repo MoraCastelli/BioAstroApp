@@ -18,6 +18,8 @@ class Editar extends Component
     public string $id;
     public array $perfil = [];
     public string $mensaje = '';
+    public array $imagenesExistentes = [];
+
 
     public $fotoUpload; // (si después lo usás para carta/foto)
     public string $imgUltimaUrl = '';
@@ -141,6 +143,13 @@ class Editar extends Component
         ];
 
         $this->perfil = array_merge($defaults, $perfil);
+        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
+            $v = $this->perfil[$k] ?? '';
+            $v = is_string($v) ? strtoupper(trim($v)) : $v;
+
+            // acepta SI / TRUE / 1 / ON / X
+            $this->perfil[$k] = in_array($v, ['SI','TRUE','1','ON','X'], true);
+        }
 
         // Calcs iniciales
         $this->calc['edad'] = $this->calcularEdadHoy($this->perfil['FECHA_NAC'] ?? null);
@@ -188,7 +197,73 @@ class Editar extends Component
         } catch (\Throwable $e) {
             $this->sabianos = [];
         }
+
+        try {
+            $this->imagenesExistentes = $svc->readImagenesWithRows($this->id);
+        } catch (\Throwable $e) {
+            $this->imagenesExistentes = [];
+        }
+
     }
+
+    public function guardarDescripcionImagen(int $i): void
+    {
+        $img = $this->imagenesExistentes[$i] ?? null;
+        if (!$img) return;
+
+        $row = (int)($img['row'] ?? 0);
+        if ($row <= 0) return;
+
+        SheetsService::make()->updateImagenDescripcion(
+            $this->id,
+            $row,
+            (string)($img['DESCRIPCION'] ?? '')
+        );
+
+        $this->mensaje = 'Descripción guardada ✔';
+    }
+
+    public function guardarDescripcionesImagenes(): void
+    {
+        $svc = SheetsService::make();
+
+        foreach ($this->imagenesExistentes as $img) {
+            $row = (int)($img['row'] ?? 0);
+            if ($row <= 0) continue;
+
+            $svc->updateImagenDescripcion(
+                $this->id,
+                $row,
+                (string)($img['DESCRIPCION'] ?? '')
+            );
+        }
+
+        $this->mensaje = 'Descripciones guardadas ✔';
+    }
+
+    public function eliminarImagen(int $i): void
+    {
+        $img = $this->imagenesExistentes[$i] ?? null;
+        if (!$img) return;
+
+        // 1) borrar de la hoja (fila exacta)
+        $row = (int)($img['row'] ?? 0);
+        if ($row > 0) {
+            SheetsService::make()->deleteImagenRow($this->id, $row);
+        }
+
+        // 2) opcional: borrar el archivo de Drive si querés (si podés extraer el fileId desde la URL)
+        // $url = (string)($img['URL'] ?? '');
+        // $fileId = $this->extractDriveFileId($url);
+        // if ($fileId) DriveService::make()->deleteFile($fileId);
+
+        // 3) recargar lista (importante porque cambian los row numbers)
+        $this->imagenesExistentes = SheetsService::make()->readImagenesWithRows($this->id);
+
+        $this->mensaje = 'Imagen eliminada ✔';
+    }
+
+
 
     public function agregarSabiano(): void
     {
@@ -397,7 +472,15 @@ class Editar extends Component
             $this->nombreOriginal = $nuevoNombre;
         }
 
-        $this->perfil['ULTIMA_ACTUALIZACION'] = Carbon::now()->toIso8601String();
+        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
+            $this->perfil[$k] = !empty($this->perfil[$k]) ? 'SI' : '';
+        }
+
+
+        foreach (['FILTRO_MELLIZOS','FILTRO_ADOPTADO','FILTRO_ABUSOS','FILTRO_SUICIDIO','FILTRO_ENFERMEDAD'] as $k) {
+            $this->perfil[$k] = !empty($this->perfil[$k]) ? 'SI' : '';
+        }
+
         SheetsService::make()->setPerfil($this->id, $this->perfil);
 
         return redirect()->route('paciente.ver', ['id' => $this->id]);

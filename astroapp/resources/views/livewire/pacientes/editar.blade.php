@@ -135,20 +135,56 @@
             Limpiar
           </button>
         </div>
-
-        @if(!empty($imgUltimaUrl))
-          <div class="pt-4 border-t">
-            <div class="text-sm text-gray-600 mb-2">Última imagen subida</div>
-
-            <button type="button"
-                    class="inline-block"
-                    @click="openImg('{{ $imgUltimaUrl }}','Última imagen subida')">
-              <img src="{{ $imgUltimaUrl }}"
-                   class="h-28 w-44 rounded-lg border object-cover hover:opacity-95 transition">
-              <div class="text-xs text-gray-500 mt-1">Click para ampliar</div>
-            </button>
+        {{-- IMÁGENES CARGADAS (EDITABLES) --}}
+        <div class="pt-4 border-t space-y-3">
+          <div class="flex items-center justify-between">
           </div>
-        @endif
+
+          @if(!empty($imagenesExistentes))
+            <div class="space-y-3">
+              @foreach($imagenesExistentes as $i => $img)
+                <div class="border rounded-xl p-3 bg-gray-50">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold text-gray-900 truncate">
+                        {{ $img['NOMBRE_IMAGEN'] ?? 'Sin título' }}
+                      </div>
+                    </div>
+
+                    <button type="button"
+                            wire:click="eliminarImagen({{ $i }})"
+                            wire:loading.attr="disabled"
+                            wire:target="eliminarImagen({{ $i }})"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700">
+                      Eliminar
+                    </button>
+                  </div>
+
+                  <label class="block text-xs text-gray-600 mt-3 mb-1">Descripción</label>
+                  <textarea rows="2"
+                            wire:model.defer="imagenesExistentes.{{ $i }}.DESCRIPCION"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white"
+                            placeholder="Escribí una descripción…"></textarea>
+
+                  <div class="mt-2 flex justify-end">
+                    <button type="button"
+                            wire:click="guardarDescripcionImagen({{ $i }})"
+                            wire:loading.attr="disabled"
+                            wire:target="guardarDescripcionImagen({{ $i }})"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          @else
+            <div class="text-sm text-gray-500">
+              No hay imágenes cargadas todavía.
+            </div>
+          @endif
+        </div>
+
       </section>
 
       {{-- 2) CONTACTO --}}
