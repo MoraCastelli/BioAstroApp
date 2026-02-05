@@ -18,11 +18,19 @@ class Buscar extends Component
     public ?string $error = null;
 
     public array $filtrosDisponibles = [
-        'FILTRO_MELLIZOS' => 'Mellizos',
-        'FILTRO_ADOPTADO' => 'Adoptado',
-        'FILTRO_ABUSOS' => 'Abusos',
-        'FILTRO_SUICIDIO' => 'Suicidio',
-        'FILTRO_ENFERMEDAD' => 'Enfermedad',
+        'FILTRO_MELLIZOS'          => 'Mellizos',
+        'FILTRO_ADOPTADO'          => 'Adoptado',
+        'FILTRO_ABUSOS'            => 'Abusos',
+        'FILTRO_SUICIDIO'          => 'Suicidio',
+        'FILTRO_SALUD'             => 'Salud',
+        'FILTRO_TEA'               => 'TEA',
+        'FILTRO_HISTORICOS'        => 'Históricos',
+        'FILTRO_FILOSOFOS'         => 'Filósofos',
+        'FILTRO_PAISES'            => 'Países',
+        'FILTRO_ECLIPSES'          => 'Eclipses',
+        'FILTRO_ANUALES'           => 'Anuales',
+        'FILTRO_MOMENTOS_CRITICOS' => 'Momentos críticos',
+        'FILTRO_INICIO_CICLOS'     => 'Inicio de ciclos',
     ];
 
 

@@ -76,6 +76,8 @@ class Editar extends Component
 
     public function mount($id): void
     {
+        
+
         $this->id = (string)$id;
 
         $svc = SheetsService::make();
@@ -225,7 +227,6 @@ class Editar extends Component
         } catch (\Throwable $e) {
             $this->imagenesExistentes = [];
         }
-
     }
 
     public function guardarDescripcionImagen(int $i): void
@@ -446,19 +447,37 @@ class Editar extends Component
     private function calcularEdadHoy(?string $nac): string
     {
         try {
-            if (!$nac) return '';
-            $years = Carbon::createFromFormat('d/m/Y', trim($nac))
-                ->diffInYears(Carbon::today());
-            return (string) ((int) $years);
+            $nac = trim((string)$nac);
+            if ($nac === '') return '';
+
+            // normalizar separadores
+            $nac = str_replace(['-', '.', ' '], '/', $nac);
+
+            // intentar DD/MM/AAAA (con o sin ceros)
+            if (preg_match('~^(\d{1,2})/(\d{1,2})/(\d{4})$~', $nac, $m)) {
+                $d = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+                $mth = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+                $y = $m[3];
+                $nac = "{$d}/{$mth}/{$y}";
+                $dt = Carbon::createFromFormat('d/m/Y', $nac);
+                return (string) $dt->diffInYears(Carbon::today());
+            }
+
+            // intentar AAAA/MM/DD (por si te llega desde algún lado así)
+            if (preg_match('~^(\d{4})/(\d{1,2})/(\d{1,2})$~', $nac, $m)) {
+                $y = $m[1];
+                $mth = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+                $d = str_pad($m[3], 2, '0', STR_PAD_LEFT);
+                $dt = Carbon::createFromFormat('Y/m/d', "{$y}/{$mth}/{$d}");
+                return (string) $dt->age;
+            }
+
+            return '';
         } catch (\Throwable $e) {
             return '';
         }
     }
 
-    /**
-     * SIEMPRE usa la carpeta padre REAL del spreadsheet.
-     * Así no te separa "Morita" vs "Paciente sin nombre".
-     */
     private function getPacienteImagesFolderId(): string
     {
         $drive = DriveService::make();

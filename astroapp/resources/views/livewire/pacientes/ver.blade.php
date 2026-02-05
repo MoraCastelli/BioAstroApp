@@ -282,16 +282,16 @@
           <div class="font-medium">{{ $perfil['FECHA_NAC'] ?? '—' }}</div>
         </div>
         <div class="p-3 rounded-lg bg-gray-50 border">
-          <div class="text-gray-500 text-xs">Hora</div>
+          <div class="text-gray-500 text-xs">Hora de Nacimiento</div>
           <div class="font-medium">{{ $perfil['HORA_NAC'] ?? '—' }}</div>
         </div>
         <div class="p-3 rounded-lg bg-gray-50 border">
-          <div class="text-gray-500 text-xs">Ciudad</div>
+          <div class="text-gray-500 text-xs">Ciudad de Nacimiento</div>
           <div class="font-medium">{{ $perfil['CIUDAD_NAC'] ?? '—' }}</div>
         </div>
         <div class="p-3 rounded-lg bg-gray-50 border">
-          <div class="text-gray-500 text-xs">País</div>
-          <div class="font-medium">{{ $perfil['PAIS_NAC'] ?? '—' }}</div>
+          <div class="text-gray-500 text-xs">Edad</div>
+          <div class="font-medium">{{ $calc['edad'] !== '' ? intval($calc['edad']) : '—' }}</div>
         </div>
         <div class="p-3 rounded-lg bg-gray-50 border">
           <div class="text-gray-500 text-xs">Signo Solar</div>

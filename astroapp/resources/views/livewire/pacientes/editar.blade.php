@@ -268,7 +268,7 @@
           <div>
             <label class="block text-sm text-gray-700">Edad (automática)</label>
             <input type="text" class="w-full border rounded-lg p-2.5 bg-gray-100"
-                   value="{{ $calc['edad'] !== '' ? $calc['edad'] : '' }}" readonly>
+                   value="{{ $calc['edad'] !== '' ? intval($calc['edad']) : '—' }}" readonly>
           </div>
 
           <div>
@@ -503,7 +503,7 @@
     <aside class="lg:col-span-1 space-y-4">
       <div class="bg-white p-4 rounded-xl shadow border border-gray-100 sticky top-4">
         <div class="flex items-center justify-between">
-          <h3 class="font-semibold">Se calcula solo</h3>
+          <h3 class="font-semibold">Se calculó </h3>
           <button type="button"
                   class="text-sm text-blue-600 hover:underline"
                   wire:click="$toggle('verMasCalc')">
@@ -514,7 +514,7 @@
         <div class="mt-3 space-y-3 text-sm">
           <div class="flex justify-between">
             <span class="text-gray-600">Edad</span>
-            <span class="font-medium">{{ $calc['edad'] !== '' ? $calc['edad'] : '—' }}</span>
+            <span class="font-medium">{{ $calc['edad'] !== '' ? intval($calc['edad']) : '—' }}</span>
           </div>
 
           <div class="pt-3 border-t">

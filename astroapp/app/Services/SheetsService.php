@@ -180,9 +180,14 @@ class SheetsService
     {
         $this->ensurePerfil($spreadsheetId);
 
-        $values = GoogleRetry::call(fn() =>
-            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Perfil!A2:B1000')->getValues() ?? []
+        $resp = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Perfil!A2:B1000', [
+                'valueRenderOption' => 'FORMATTED_VALUE', // 👈 clave
+                'dateTimeRenderOption' => 'FORMATTED_STRING',
+            ])
         );
+
+        $values = $resp->getValues() ?? [];
 
         $out = [];
         foreach ($values as $row) {
@@ -190,8 +195,10 @@ class SheetsService
             $v = $row[1] ?? '';
             if ($k !== '') $out[$k] = $v;
         }
+
         return $out;
     }
+
 
 
     public function setPerfil(string $spreadsheetId, array $kv): void
