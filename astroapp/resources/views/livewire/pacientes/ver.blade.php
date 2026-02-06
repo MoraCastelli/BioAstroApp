@@ -553,7 +553,10 @@
       </a>
     </div>
 
-    @php $encs = $encuentros ?? []; @endphp
+    @php
+      $encs = array_reverse($encuentros ?? []);
+    @endphp
+
 
     @if(empty($encs))
       <div class="text-sm text-gray-500 italic">No hay encuentros cargados todavía.</div>
@@ -561,8 +564,17 @@
       <div class="divide-y border rounded-xl overflow-hidden">
         @foreach($encs as $idx => $e)
           @php
-            $n = $idx + 1;
-            $titulo = $n === 1 ? '1er Encuentro' : ($n === 2 ? '2do Encuentro' : ($n === 3 ? '3er Encuentro' : $n.'º Encuentro'));
+            $total = count($encs);
+            $n = $total - $idx;
+
+            $titulo = $n === 1
+                ? '1er Encuentro'
+                : ($n === 2
+                    ? '2do Encuentro'
+                    : ($n === 3
+                        ? '3er Encuentro'
+                        : $n . 'º Encuentro'));
+
             $fecha = $e['FECHA'] ?? '—';
           @endphp
 
@@ -595,9 +607,12 @@
               </div>
               <div class="p-3 bg-white border rounded-lg">
                 <div class="text-xs text-gray-500">Edad</div>
-                <div class="font-medium">{{ $e['EDAD_EN_ESE_ENCUENTRO'] ?? '—' }}</div>
+                <div class="font-medium">
+                  {{ isset($e['EDAD_EN_ESE_ENCUENTRO']) && is_numeric($e['EDAD_EN_ESE_ENCUENTRO'])
+                      ? intval($e['EDAD_EN_ESE_ENCUENTRO'])
+                      : '—' }}
+                </div>
               </div>
-
               <div class="lg:col-span-3 p-3 bg-white border rounded-lg">
                 <div class="text-xs text-gray-500">Temas tratados</div>
                 <div class="whitespace-pre-line text-gray-800 mt-1">{{ $e['TEMAS_TRATADOS'] ?? '—' }}</div>
