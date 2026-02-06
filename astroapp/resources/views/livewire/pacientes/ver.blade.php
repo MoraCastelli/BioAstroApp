@@ -499,50 +499,56 @@
       </div>
 
       <div class="p-4 rounded-lg bg-gray-50 border">
-  <div class="font-semibold">Resumen para Psicóloga</div>
+        <div class="font-semibold">Resumen para Psicóloga</div>
 
-  <p class="whitespace-pre-line text-gray-700 mt-2">
-    {{ $perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '—' }}
-  </p>
+        <p class="whitespace-pre-line text-gray-700 mt-2">
+          {{ $perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '—' }}
+        </p>
 
-  {{-- Audios --}}
-  @if(!empty($audios))
-    <div class="mt-4 space-y-3">
-      @foreach($audios as $a)
-        @php
-          $fileId = (string)($a['FILE_ID'] ?? '');
-          $src = $a['DOWNLOAD_URL'] ?? ($fileId ? "https://drive.google.com/uc?export=download&id={$fileId}" : '');
-        @endphp
+        {{-- Audios --}}
+        @if(!empty($audios))
+          <div class="mt-4 space-y-3">
+            @foreach($audios as $a)
+              @php
+                $fileId = trim((string)($a['FILE_ID'] ?? ''));
+                $src = $fileId ? route('drive.audio', ['fileId' => $fileId]) : '';
 
-        @if($src)
-          <div class="bg-white border rounded-lg p-3">
-            <div class="text-sm font-medium">{{ $a['TITULO'] ?? 'Audio' }}</div>
-            @if(!empty($a['DESCRIPCION']))
-              <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $a['DESCRIPCION'] }}</div>
-            @endif
-            <audio class="w-full mt-2" controls preload="none">
-              <source src="{{ $src }}">
-            </audio>
+                $titulo = $a['TITULO'] ?? 'Audio';
+                $desc   = $a['DESCRIPCION'] ?? '';
+              @endphp
+
+              @if($src)
+                <div class="bg-white border rounded-lg p-3">
+                  <div class="text-sm font-medium">{{ $titulo }}</div>
+
+                  @if(trim($desc) !== '')
+                    <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $desc }}</div>
+                  @endif
+
+                  <audio class="w-full mt-2" controls preload="metadata">
+                    <source src="{{ $src }}">
+                    Tu navegador no soporta audio HTML5.
+                  </audio>
+
+                </div>
+              @endif
+            @endforeach
           </div>
+        @else
+          <div class="text-xs text-gray-400 mt-2">Sin audios cargados.</div>
         @endif
-      @endforeach
-    </div>
-  @else
-    {{-- si querés ocultarlo, sacá este else --}}
-    <div class="text-xs text-gray-400 mt-2">Sin audios cargados.</div>
-  @endif
-</div>
-
+      </div>
     </div>
   </section>
 
+
   {{-- ENCUENTROS (ACORDEÓN) --}}
   <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4"
-           x-data="{ open: null }">
+          x-data="{ open: null }">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold text-lg">Encuentros</h2>
       <a href="{{ route('paciente.nuevo-encuentro', $id) }}"
-         class="text-sm text-emerald-700 hover:underline">
+        class="text-sm text-emerald-700 hover:underline">
         + Agregar encuentro
       </a>
     </div>

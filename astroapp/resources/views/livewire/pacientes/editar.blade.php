@@ -513,37 +513,38 @@
           </button>
         </div>
 
-        {{-- LISTA --}}
         @if(!empty($audios))
           <div class="pt-4 border-t space-y-3">
-            @foreach($audios as $a)
+            @foreach($audios as $i => $a)
               @php
-                $fileId = (string)($a['FILE_ID'] ?? '');
-                $src = $a['DOWNLOAD_URL'] ?? ($fileId ? "https://drive.google.com/uc?export=download&id={$fileId}" : '');
+                $fileId = trim((string)($a['FILE_ID'] ?? ''));
+                // Lo ideal: reproducir vía tu proxy también (ver más abajo)
+                $src = $fileId ? route('drive.audio', ['fileId' => $fileId]) : '';
               @endphp
 
               <div class="border rounded-xl p-4 bg-gray-50">
                 <div class="flex items-start justify-between gap-4">
-                  <div class="min-w-0">
+                  <div class="min-w-0 w-full">
                     <div class="font-medium">{{ $a['TITULO'] ?? 'Audio' }}</div>
+
                     @if(!empty($a['DESCRIPCION']))
                       <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $a['DESCRIPCION'] }}</div>
                     @endif
 
                     @if($src)
-                      <audio class="w-full mt-3" controls preload="none">
-                        <source src="{{ $src }}">
+                      <audio class="w-full mt-3" controls preload="metadata">
+                        <source src="{{ $src }}" type="audio/mpeg">
                       </audio>
+                    @else
+                      <div class="text-xs text-gray-500 mt-2 italic">Audio sin FILE_ID.</div>
                     @endif
                   </div>
 
-                  @if($fileId)
-                    <button type="button"
-                            wire:click="eliminarAudioPaciente('{{ $fileId }}')"
-                            class="shrink-0 text-sm px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100">
-                      Eliminar
-                    </button>
-                  @endif
+                  <button type="button"
+                          wire:click="eliminarAudioPaciente({{ $i }})"
+                          class="shrink-0 text-sm px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100">
+                    Eliminar
+                  </button>
                 </div>
               </div>
             @endforeach

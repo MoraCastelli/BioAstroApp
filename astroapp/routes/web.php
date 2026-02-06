@@ -17,6 +17,9 @@ Route::get('/', function () {
 Route::get('/media/drive/{fileId}', [PacienteController::class, 'driveImage'])
   ->name('drive.image');
 
+Route::get('/media/drive-audio/{fileId}', [PacienteController::class, 'driveAudio'])
+  ->name('drive.audio');
+
 
 // OAuth
 Route::get('/google/auth', [GoogleAuthController::class, 'redirect'])->name('google.auth');

@@ -301,7 +301,7 @@ class DriveService
 
     public function ensurePacienteFolders(string $pacienteNombre): array
     {
-        $root = (string) config('services.google.db_folder_id'); // ✅
+        $root = (string) config('services.google.db_folder_id');
         if ($root === '') {
             throw new \RuntimeException('Falta services.google.db_folder_id');
         }
@@ -309,7 +309,7 @@ class DriveService
         $pacienteFolderId = $this->ensureFolderByName($pacienteNombre, $root);
         $imagenesFolderId = $this->ensureFolderByName('Imagenes', $pacienteFolderId);
         $audiosFolderId   = $this->ensureFolderByName('Audios', $pacienteFolderId);
-        
+
         return [
             'pacienteFolderId' => $pacienteFolderId,
             'imagenesFolderId' => $imagenesFolderId,

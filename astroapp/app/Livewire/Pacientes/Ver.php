@@ -32,7 +32,6 @@ class Ver extends Component
     {
         $this->id = (string) $id;
         $this->ocultarNombres = (bool) session('pacientes.ocultar_nombres', false);
-        $this->audios = method_exists($svc, 'readAudios') ? $svc->readAudios($this->id) : [];
 
         try {
             $svc = SheetsService::make();
@@ -41,14 +40,15 @@ class Ver extends Component
             $this->encuentros = $svc->readEncuentros($this->id);
             $this->sabianos   = $svc->readSabianos($this->id);
             $this->imagenes   = method_exists($svc, 'readImagenes') ? $svc->readImagenes($this->id) : [];
+            $this->audios     = method_exists($svc, 'readAudios')   ? $svc->readAudios($this->id)   : [];
 
-            // ✅ ahora sí, con perfil cargado
             $this->calc['edad'] = $this->calcularEdadHoy($this->perfil['FECHA_NAC'] ?? null);
 
         } catch (\Throwable $e) {
             $this->error = $e->getMessage();
         }
     }
+
 
 
     public function toggleNombre(): void
@@ -98,9 +98,14 @@ class Ver extends Component
             'perfil' => $this->perfil,
             'encuentros' => $this->encuentros,
             'imagenes' => $this->imagenes,
+            'audios' => $this->audios,
+            'calc' => $this->calc,
             'error' => $this->error,
             'id' => $this->id,
             'sabianos' => $this->sabianos,
+            'ocultarNombres' => $this->ocultarNombres,
         ])->layout('components.layouts.app');
     }
+
+
 }

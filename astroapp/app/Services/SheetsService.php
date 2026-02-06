@@ -574,15 +574,18 @@ class SheetsService
         }));
     }
 
+    /* ======================= Audios ======================= */
+
     private function ensureAudios(string $spreadsheetId): void
     {
         $this->ensureSheet($spreadsheetId, 'Audios');
 
-        $headers = new ValueRange([
-            'values' => [[ 'FECHA','TITULO','DESCRIPCION','FILE_ID','DOWNLOAD_URL' ]],
+        // Header: A..E
+        $headers = new \Google\Service\Sheets\ValueRange([
+            'values' => [[ 'FILE_ID','TITULO','URL','DESCRIPCION','ELIMINADO' ]],
         ]);
 
-        GoogleRetry::call(fn() =>
+        \App\Support\GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->update(
                 $spreadsheetId,
                 'Audios!A1:E1',
@@ -602,16 +605,16 @@ class SheetsService
         $this->ensureAudios($spreadsheetId);
 
         $row = [
-            $a['FECHA']        ?? '',
-            $a['TITULO']       ?? '',
-            $a['DESCRIPCION']  ?? '',
-            $a['FILE_ID']      ?? '',
-            $a['DOWNLOAD_URL'] ?? '',
+            $a['FILE_ID'] ?? '',
+            $a['TITULO'] ?? '',
+            $a['URL'] ?? '',
+            $a['DESCRIPCION'] ?? '',
+            $a['ELIMINADO'] ?? '', // vacío por defecto
         ];
 
-        $body = new ValueRange(['values' => [ $row ]]);
+        $body = new \Google\Service\Sheets\ValueRange(['values' => [ $row ]]);
 
-        GoogleRetry::call(fn() =>
+        \App\Support\GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values->append(
                 $spreadsheetId,
                 'Audios!A1:E1',
@@ -625,25 +628,72 @@ class SheetsService
     {
         $this->ensureAudios($spreadsheetId);
 
-        $values = GoogleRetry::call(fn() =>
+        $values = \App\Support\GoogleRetry::call(fn() =>
             $this->sheets->spreadsheets_values
                 ->get($spreadsheetId, 'Audios!A2:E100000')
                 ->getValues() ?? []
         );
 
         $out = array_map(fn($r) => [
-            'FECHA'        => $r[0] ?? '',
-            'TITULO'       => $r[1] ?? '',
-            'DESCRIPCION'  => $r[2] ?? '',
-            'FILE_ID'      => $r[3] ?? '',
-            'DOWNLOAD_URL' => $r[4] ?? '',
+            'FILE_ID'     => $r[0] ?? '',
+            'TITULO'      => $r[1] ?? '',
+            'URL'         => $r[2] ?? '',
+            'DESCRIPCION' => $r[3] ?? '',
+            'ELIMINADO'   => $r[4] ?? '',
         ], $values);
 
-        // filtrar vacíos
-        return array_values(array_filter($out, fn($row) =>
-            trim((string)($row['FILE_ID'] ?? '')) !== '' || trim((string)($row['DOWNLOAD_URL'] ?? '')) !== ''
-        ));
+        // filtrar vacíos y eliminados
+        return array_values(array_filter($out, function ($row) {
+            $fid = trim((string)($row['FILE_ID'] ?? ''));
+            if ($fid === '') return false;
+
+            $del = strtoupper(trim((string)($row['ELIMINADO'] ?? '')));
+            return !in_array($del, ['SI','TRUE','1','X','ON'], true);
+        }));
     }
+
+    /**
+     * Marca un audio como eliminado (soft delete) buscando por FILE_ID
+     * y escribiendo "SI" en la columna E.
+     */
+    public function markAudioDeleted(string $spreadsheetId, string $fileId): void
+    {
+        $this->ensureAudios($spreadsheetId);
+
+        $fileId = trim($fileId);
+        if ($fileId === '') return;
+
+        $resp = \App\Support\GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Audios!A2:E100000')
+        );
+
+        $values = $resp->getValues() ?? [];
+
+        $targetRow = null; // row real en Sheets
+        foreach ($values as $i => $r) {
+            $fid = trim((string)($r[0] ?? ''));
+            if ($fid === $fileId) {
+                $targetRow = 2 + $i; // empieza en A2
+                break;
+            }
+        }
+
+        if ($targetRow === null) return;
+
+        $body = new \Google\Service\Sheets\ValueRange([
+            'values' => [[ 'SI' ]]
+        ]);
+
+        \App\Support\GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                "Audios!E{$targetRow}",
+                $body,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
+
 
     public function readAudiosWithRows(string $spreadsheetId): array
     {

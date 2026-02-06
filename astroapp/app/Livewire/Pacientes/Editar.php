@@ -459,22 +459,31 @@ class Editar extends Component
         $this->mensaje = 'Audio subido y registrado ✔';
     }
 
-
-    public function eliminarAudioPaciente(string $fileId): void
+    public function eliminarAudioPaciente(int $index): void
     {
-        $drive = DriveService::make();
+        $a = $this->audios[$index] ?? null;
+        if (!$a) return;
+
+        $fileId = trim((string)($a['FILE_ID'] ?? ''));
+        if ($fileId === '') {
+            $this->mensaje = 'Ese audio no tiene FILE_ID (no puedo borrarlo).';
+            return;
+        }
+
+        $drive = \App\Services\DriveService::make();
 
         // 1) borrar de Drive
         $drive->deleteFileById($fileId);
 
-        // 2) marcar en sheet (implementás este método)
-        SheetsService::make()->markAudioDeleted($this->id, $fileId);
+        // 2) marcar en sheet
+        \App\Services\SheetsService::make()->markAudioDeleted($this->id, $fileId);
 
         // 3) refrescar lista
-        $this->audios = SheetsService::make()->readAudios($this->id);
+        $this->audios = \App\Services\SheetsService::make()->readAudios($this->id);
 
         $this->mensaje = 'Audio eliminado ✔';
     }
+
 
     public function subirImagenPaciente(): void
     {

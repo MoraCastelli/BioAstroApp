@@ -83,4 +83,23 @@ class PacienteController extends Controller
             return response('', 404);
         }
     }
+
+    public function driveAudio(string $fileId)
+    {
+        try {
+            $drive = DriveService::make();
+            $data = $drive->downloadBytes($fileId);
+
+            return response($data['bytes'], 200, [
+                'Content-Type'        => $data['mime'] ?? 'audio/mpeg',
+                'Content-Disposition' => 'inline',
+                'Accept-Ranges'       => 'bytes',
+                'Cache-Control'       => 'private, max-age=3600',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('drive.audio failed', ['fileId' => $fileId, 'error' => $e->getMessage()]);
+            return response('', 404);
+        }
+    }
+
 }
