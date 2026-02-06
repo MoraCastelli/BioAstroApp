@@ -568,11 +568,11 @@
             $n = $total - $idx;
 
             $titulo = $n === 1
-                ? '1er Encuentro'
+                ? '1º Encuentro'
                 : ($n === 2
-                    ? '2do Encuentro'
+                    ? '2º Encuentro'
                     : ($n === 3
-                        ? '3er Encuentro'
+                        ? '3º Encuentro'
                         : $n . 'º Encuentro'));
 
             $fecha = $e['FECHA'] ?? '—';
