@@ -467,22 +467,90 @@
 
       </section>
 
-      {{-- 9) RESUMEN --}}
       <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
-        <h2 class="font-semibold text-lg">Resumen para psicóloga</h2>
-        <div class="grid md:grid-cols-3 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm text-gray-700">Resumen (texto)</label>
-            <textarea wire:model.defer="perfil.RESUMEN_PARA_PSICOLOGA_TEXTO" rows="3"
-                      class="w-full border border-gray-300 rounded-lg p-2.5"></textarea>
-          </div>
+        <div class="flex items-start justify-between gap-3">
           <div>
-            <label class="block text-sm text-gray-700">URL del audio (opcional)</label>
-            <input type="url" wire:model.defer="perfil.RESUMEN_PARA_PSICOLOGA_URL_AUDIO"
-                   class="w-full border border-gray-300 rounded-lg p-2.5">
+            <h2 class="font-semibold text-lg">Audios</h2>
+            <p class="text-sm text-gray-600">
+              Se guardan en Drive (carpeta Audios) y se registran en la hoja “Audios”.
+            </p>
           </div>
         </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1 text-gray-700">Título</label>
+            <input type="text" wire:model.defer="audioTitulo"
+                  class="w-full border border-gray-300 rounded-lg p-2.5"
+                  placeholder="Ej: Resumen sesión 1">
+            @error('audioTitulo') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1 text-gray-700">Archivo</label>
+            <input type="file" accept="audio/*" wire:model="audioUpload"
+                  class="w-full border border-gray-300 rounded-lg p-2.5 bg-white">
+            <div class="text-xs text-gray-500 mt-1" wire:loading wire:target="audioUpload">Cargando audio…</div>
+            @error('audioUpload') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium mb-1 text-gray-700">Descripción (opcional)</label>
+            <textarea wire:model.defer="audioDescripcion" rows="2"
+                      class="w-full border border-gray-300 rounded-lg p-2.5"
+                      placeholder="Notas…"></textarea>
+            @error('audioDescripcion') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="button" wire:click="subirAudioPaciente"
+                  wire:loading.attr="disabled"
+                  wire:target="subirAudioPaciente,audioUpload"
+                  class="bg-emerald-600 hover:bg-emerald-700 transition text-white px-4 py-2 rounded-lg">
+            Subir audio
+            <span wire:loading wire:target="subirAudioPaciente" class="ml-2 text-white/80 text-xs">Subiendo…</span>
+          </button>
+        </div>
+
+        {{-- LISTA --}}
+        @if(!empty($audios))
+          <div class="pt-4 border-t space-y-3">
+            @foreach($audios as $a)
+              @php
+                $fileId = (string)($a['FILE_ID'] ?? '');
+                $src = $a['DOWNLOAD_URL'] ?? ($fileId ? "https://drive.google.com/uc?export=download&id={$fileId}" : '');
+              @endphp
+
+              <div class="border rounded-xl p-4 bg-gray-50">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="font-medium">{{ $a['TITULO'] ?? 'Audio' }}</div>
+                    @if(!empty($a['DESCRIPCION']))
+                      <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $a['DESCRIPCION'] }}</div>
+                    @endif
+
+                    @if($src)
+                      <audio class="w-full mt-3" controls preload="none">
+                        <source src="{{ $src }}">
+                      </audio>
+                    @endif
+                  </div>
+
+                  @if($fileId)
+                    <button type="button"
+                            wire:click="eliminarAudioPaciente('{{ $fileId }}')"
+                            class="shrink-0 text-sm px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100">
+                      Eliminar
+                    </button>
+                  @endif
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
       </section>
+
 
       {{-- ACCIONES INFERIORES --}}
       <div class="flex gap-3">

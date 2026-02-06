@@ -19,6 +19,11 @@ class Editar extends Component
     public array $perfil = [];
     public string $mensaje = '';
     public array $imagenesExistentes = [];
+    public $audioUpload;
+    public string $audioTitulo = '';
+    public string $audioDescripcion = '';
+    public array $audios = [];
+
 
 
     public $fotoUpload; // (si después lo usás para carta/foto)
@@ -70,7 +75,9 @@ class Editar extends Component
         'imgUpload' => 'nullable|image|max:5120',
         'imgNombre' => 'required_with:imgUpload|string|max:80',
         'imgDescripcion' => 'nullable|string|max:400',
-
+        'audioUpload' => 'nullable|file|max:51200|mimetypes:audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,audio/webm',
+        'audioTitulo' => 'required_with:audioUpload|string|max:80',
+        'audioDescripcion' => 'nullable|string|max:400',
         'nuevoEncuentro.FECHA' => 'nullable|regex:/^\d{2}\/\d{2}\/\d{4}$/',
     ];
 
@@ -84,6 +91,7 @@ class Editar extends Component
         $perfil = $svc->getPerfil($this->id);
 
         $this->nombreOriginal = (string)($perfil['NOMBRE_Y_APELLIDO'] ?? '');
+        $this->audios = method_exists($svc, 'readAudios') ? $svc->readAudios($this->id) : [];
 
         // Defaults
         $defaults = [
@@ -384,6 +392,88 @@ class Editar extends Component
                 }
             }
         }
+    }
+
+    private function getPacienteAudiosFolderId(): string
+    {
+        $drive = DriveService::make();
+        $parents = $drive->getParents($this->id);
+        $folderPaciente = $parents[0] ?? null;
+
+        if (!$folderPaciente) {
+            throw new \RuntimeException('No pude detectar la carpeta padre del Spreadsheet del paciente.');
+        }
+
+        return $drive->ensureChildFolder($folderPaciente, 'Audios');
+    }
+
+    public function subirAudioPaciente(): void
+    {
+        $this->validate([
+            'audioUpload' => 'required|file|max:51200|mimetypes:audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,audio/webm',
+            'audioTitulo' => 'required|string|max:80',
+            'audioDescripcion' => 'nullable|string|max:400',
+        ]);
+
+        $folderAudios = $this->getPacienteAudiosFolderId();
+
+        $ext = $this->audioUpload->getClientOriginalExtension() ?: 'mp3';
+
+        $safeTitle = (string) Str::of($this->audioTitulo)
+            ->trim()
+            ->replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')
+            ->limit(60, '');
+
+        Storage::disk('local')->makeDirectory('tmp');
+        $tmpName = 'au_' . Str::random(20) . '.' . $ext;
+        $tmpPath = $this->audioUpload->storeAs('tmp', $tmpName, 'local');
+
+        if (!$tmpPath) throw new \RuntimeException('No se pudo guardar el audio temporal.');
+
+        $absPath = Storage::disk('local')->path($tmpPath);
+        if (!is_file($absPath)) throw new \RuntimeException("Audio temporal no existe: {$absPath}");
+
+        $drive = DriveService::make();
+
+        $fileName = $safeTitle . ' - ' . now()->format('Ymd_His') . '.' . $ext;
+
+        $fileId = $drive->uploadAudioToFolder($absPath, $fileName, $folderAudios);
+        $drive->makeAnyoneReader($fileId);
+
+        $downloadUrl = $drive->getPublicDownloadUrl($fileId);
+
+        SheetsService::make()->appendAudio($this->id, [
+            'FECHA'        => now()->format('d/m/Y'),
+            'TITULO'       => (string) $this->audioTitulo,
+            'DESCRIPCION'  => (string) $this->audioDescripcion,
+            'FILE_ID'      => (string) $fileId,
+            'DOWNLOAD_URL' => (string) $downloadUrl,
+        ]);
+
+        Storage::disk('local')->delete($tmpPath);
+
+        // refrescar lista
+        $this->audios = SheetsService::make()->readAudios($this->id);
+
+        $this->reset(['audioUpload','audioTitulo','audioDescripcion']);
+        $this->mensaje = 'Audio subido y registrado ✔';
+    }
+
+
+    public function eliminarAudioPaciente(string $fileId): void
+    {
+        $drive = DriveService::make();
+
+        // 1) borrar de Drive
+        $drive->deleteFileById($fileId);
+
+        // 2) marcar en sheet (implementás este método)
+        SheetsService::make()->markAudioDeleted($this->id, $fileId);
+
+        // 3) refrescar lista
+        $this->audios = SheetsService::make()->readAudios($this->id);
+
+        $this->mensaje = 'Audio eliminado ✔';
     }
 
     public function subirImagenPaciente(): void

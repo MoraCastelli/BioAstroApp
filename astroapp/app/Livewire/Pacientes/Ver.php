@@ -19,6 +19,8 @@ class Ver extends Component
     public array $nuevoSabiano = ['SIGNO'=>'','GRADO'=>''];
     public string $mensaje = '';
     public bool $ocultarNombres = false;
+    public array $audios = [];
+
 
     
     public array $calc = [
@@ -30,6 +32,7 @@ class Ver extends Component
     {
         $this->id = (string) $id;
         $this->ocultarNombres = (bool) session('pacientes.ocultar_nombres', false);
+        $this->audios = method_exists($svc, 'readAudios') ? $svc->readAudios($this->id) : [];
 
         try {
             $svc = SheetsService::make();

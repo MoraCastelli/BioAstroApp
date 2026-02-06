@@ -488,7 +488,7 @@ class SheetsService
         $this->ensurePerfil($newSpreadsheetId);
         $this->ensureEncuentros($newSpreadsheetId);
         $this->ensureImagenes($newSpreadsheetId);
-
+        $this->ensureAudios($newSpreadsheetId);
         return $newSpreadsheetId;
     }
 
@@ -574,7 +574,149 @@ class SheetsService
         }));
     }
 
+    private function ensureAudios(string $spreadsheetId): void
+    {
+        $this->ensureSheet($spreadsheetId, 'Audios');
 
+        $headers = new ValueRange([
+            'values' => [[ 'FECHA','TITULO','DESCRIPCION','FILE_ID','DOWNLOAD_URL' ]],
+        ]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->update(
+                $spreadsheetId,
+                'Audios!A1:E1',
+                $headers,
+                ['valueInputOption' => 'RAW']
+            )
+        );
+    }
+
+    public function ensureAudiosSheet(string $spreadsheetId): void
+    {
+        $this->ensureAudios($spreadsheetId);
+    }
+
+    public function appendAudio(string $spreadsheetId, array $a): void
+    {
+        $this->ensureAudios($spreadsheetId);
+
+        $row = [
+            $a['FECHA']        ?? '',
+            $a['TITULO']       ?? '',
+            $a['DESCRIPCION']  ?? '',
+            $a['FILE_ID']      ?? '',
+            $a['DOWNLOAD_URL'] ?? '',
+        ];
+
+        $body = new ValueRange(['values' => [ $row ]]);
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->append(
+                $spreadsheetId,
+                'Audios!A1:E1',
+                $body,
+                ['valueInputOption' => 'RAW', 'insertDataOption' => 'INSERT_ROWS']
+            )
+        );
+    }
+
+    public function readAudios(string $spreadsheetId): array
+    {
+        $this->ensureAudios($spreadsheetId);
+
+        $values = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values
+                ->get($spreadsheetId, 'Audios!A2:E100000')
+                ->getValues() ?? []
+        );
+
+        $out = array_map(fn($r) => [
+            'FECHA'        => $r[0] ?? '',
+            'TITULO'       => $r[1] ?? '',
+            'DESCRIPCION'  => $r[2] ?? '',
+            'FILE_ID'      => $r[3] ?? '',
+            'DOWNLOAD_URL' => $r[4] ?? '',
+        ], $values);
+
+        // filtrar vacíos
+        return array_values(array_filter($out, fn($row) =>
+            trim((string)($row['FILE_ID'] ?? '')) !== '' || trim((string)($row['DOWNLOAD_URL'] ?? '')) !== ''
+        ));
+    }
+
+    public function readAudiosWithRows(string $spreadsheetId): array
+    {
+        $this->ensureAudios($spreadsheetId);
+
+        $resp = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets_values->get($spreadsheetId, 'Audios!A2:E100000')
+        );
+
+        $values = $resp->getValues() ?? [];
+
+        $out = [];
+        foreach ($values as $i => $r) {
+            $fileId = trim((string)($r[3] ?? ''));
+            $dl     = trim((string)($r[4] ?? ''));
+
+            if ($fileId === '' && $dl === '') continue;
+
+            $out[] = [
+                'row'          => 2 + $i,
+                'FECHA'        => $r[0] ?? '',
+                'TITULO'       => $r[1] ?? '',
+                'DESCRIPCION'  => $r[2] ?? '',
+                'FILE_ID'      => $r[3] ?? '',
+                'DOWNLOAD_URL' => $r[4] ?? '',
+            ];
+        }
+
+        return $out;
+    }
+
+    public function deleteAudioRow(string $spreadsheetId, int $row): void
+    {
+        $this->ensureAudios($spreadsheetId);
+
+        $ss = GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->get($spreadsheetId, [
+                'fields' => 'sheets(properties(sheetId,title))'
+            ])
+        );
+
+        $sheetId = null;
+        foreach (($ss->getSheets() ?? []) as $s) {
+            if (($s->getProperties()->getTitle() ?? '') === 'Audios') {
+                $sheetId = $s->getProperties()->getSheetId();
+                break;
+            }
+        }
+        if ($sheetId === null) return;
+
+        $start = max(0, $row - 1);
+        $end   = $start + 1;
+
+        $requests = [
+            new \Google\Service\Sheets\Request([
+                'deleteDimension' => [
+                    'range' => [
+                        'sheetId' => $sheetId,
+                        'dimension' => 'ROWS',
+                        'startIndex' => $start,
+                        'endIndex' => $end,
+                    ],
+                ],
+            ]),
+        ];
+
+        GoogleRetry::call(fn() =>
+            $this->sheets->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests])
+            )
+        );
+    }
 
     /* ======================= Utilidad ======================= */
 

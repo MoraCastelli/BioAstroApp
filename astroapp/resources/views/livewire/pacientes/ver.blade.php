@@ -499,15 +499,40 @@
       </div>
 
       <div class="p-4 rounded-lg bg-gray-50 border">
-        <div class="font-semibold">Resumen para Psicóloga</div>
-        <p class="whitespace-pre-line text-gray-700 mt-2">{{ $perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '—' }}</p>
-        @if(!empty($perfil['RESUMEN_PARA_PSICOLOGA_URL_AUDIO']))
-          <a href="{{ $perfil['RESUMEN_PARA_PSICOLOGA_URL_AUDIO'] }}"
-             class="text-blue-600 underline text-sm mt-2 inline-block" target="_blank">
-            Escuchar audio
-          </a>
+  <div class="font-semibold">Resumen para Psicóloga</div>
+
+  <p class="whitespace-pre-line text-gray-700 mt-2">
+    {{ $perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '—' }}
+  </p>
+
+  {{-- Audios --}}
+  @if(!empty($audios))
+    <div class="mt-4 space-y-3">
+      @foreach($audios as $a)
+        @php
+          $fileId = (string)($a['FILE_ID'] ?? '');
+          $src = $a['DOWNLOAD_URL'] ?? ($fileId ? "https://drive.google.com/uc?export=download&id={$fileId}" : '');
+        @endphp
+
+        @if($src)
+          <div class="bg-white border rounded-lg p-3">
+            <div class="text-sm font-medium">{{ $a['TITULO'] ?? 'Audio' }}</div>
+            @if(!empty($a['DESCRIPCION']))
+              <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $a['DESCRIPCION'] }}</div>
+            @endif
+            <audio class="w-full mt-2" controls preload="none">
+              <source src="{{ $src }}">
+            </audio>
+          </div>
         @endif
-      </div>
+      @endforeach
+    </div>
+  @else
+    {{-- si querés ocultarlo, sacá este else --}}
+    <div class="text-xs text-gray-400 mt-2">Sin audios cargados.</div>
+  @endif
+</div>
+
     </div>
   </section>
 

@@ -58,7 +58,7 @@ class DriveService
     public function ensureChildFolder(string $parentId, string $title): string
     {
         $id = $this->findByNameInFolder($parentId, $title);
-        return $id ?: $this->createFolder($title, $parentId);
+        return $id ?: $this->ensureFolderByName($title, $parentId);
     }
 
 
@@ -308,10 +308,12 @@ class DriveService
 
         $pacienteFolderId = $this->ensureFolderByName($pacienteNombre, $root);
         $imagenesFolderId = $this->ensureFolderByName('Imagenes', $pacienteFolderId);
-
+        $audiosFolderId   = $this->ensureFolderByName('Audios', $pacienteFolderId);
+        
         return [
             'pacienteFolderId' => $pacienteFolderId,
             'imagenesFolderId' => $imagenesFolderId,
+            'audiosFolderId'   => $audiosFolderId,
         ];
     }
 
@@ -333,6 +335,47 @@ class DriveService
             )
         );
     }
+
+    public function uploadAudioToFolder(string $localPath, string $name, string $folderId): string
+    {
+        if (!is_file($localPath)) {
+            throw new \RuntimeException("Archivo temporal no existe: {$localPath}");
+        }
+
+        $mime = 'audio/mpeg';
+        if (function_exists('finfo_open')) {
+            $f = finfo_open(FILEINFO_MIME_TYPE);
+            $det = finfo_file($f, $localPath) ?: null;
+            finfo_close($f);
+            if ($det) $mime = $det;
+        }
+
+        $meta = new \Google\Service\Drive\DriveFile([
+            'name'    => $name,
+            'parents' => [$folderId],
+            'mimeType'=> $mime,
+        ]);
+
+        $file = \App\Support\GoogleRetry::call(fn() =>
+            $this->drive->files->create(
+                $meta,
+                [
+                    'data'       => file_get_contents($localPath),
+                    'mimeType'   => $mime,
+                    'uploadType' => 'multipart',
+                    'fields'     => 'id',
+                ]
+            )
+        );
+
+        return $file->id;
+    }
+
+    public function getPublicDownloadUrl(string $fileId): string
+    {
+        return "https://drive.google.com/uc?export=download&id={$fileId}";
+    }
+
 
     public function getShareLink(string $fileId): string
     {
