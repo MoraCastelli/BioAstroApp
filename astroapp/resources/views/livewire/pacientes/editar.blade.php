@@ -125,12 +125,6 @@
             Subir imagen
             <span wire:loading wire:target="subirImagenPaciente" class="ml-2 text-white/80 text-xs">Subiendo…</span>
           </button>
-
-          <button type="button"
-                  wire:click="limpiarImagenForm"
-                  class="px-4 py-2 rounded-lg border border-gray-300 bg-white">
-            Limpiar
-          </button>
         </div>
         {{-- IMÁGENES CARGADAS (EDITABLES) --}}
         <div class="pt-4 border-t space-y-3">
