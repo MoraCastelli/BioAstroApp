@@ -86,10 +86,7 @@
       <section class="bg-white p-5 rounded-xl shadow border border-gray-100 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h2 class="font-semibold text-lg">Imágenes del paciente</h2>
-            <p class="text-sm text-gray-600">
-              Se guardan en Drive y se registran en la hoja “Imagenes”.
-            </p>
+            <h2 class="font-semibold text-lg">Imágenes</h2>
           </div>
         </div>
 
@@ -98,7 +95,7 @@
             <label class="block text-sm font-medium mb-1 text-gray-700">Título</label>
             <input type="text" wire:model.defer="imgNombre"
                    class="w-full border border-gray-300 rounded-lg p-2.5"
-                   placeholder="Ej: Foto infancia">
+                   placeholder="Ej: Foto carta natal">
             @error('imgNombre') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
           </div>
 
@@ -106,7 +103,7 @@
             <label class="block text-sm font-medium mb-1 text-gray-700">Archivo</label>
             <input type="file" accept="image/*" wire:model="imgUpload"
                    class="w-full border border-gray-300 rounded-lg p-2.5 bg-white">
-            <div class="text-xs text-gray-500 mt-1" wire:loading wire:target="imgUpload">Cargando archivo…</div>
+            <div class="text-xs text-gray-500 mt-1" wire:loading wire:target="imgUpload">Cargando imágen…</div>
             @error('imgUpload') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
           </div>
 
@@ -114,7 +111,7 @@
             <label class="block text-sm font-medium mb-1 text-gray-700">Descripción (opcional)</label>
             <textarea wire:model.defer="imgDescripcion" rows="2"
                       class="w-full border border-gray-300 rounded-lg p-2.5"
-                      placeholder="Breve descripción para la hoja Imagenes…"></textarea>
+                      placeholder="Notas…"></textarea>
             @error('imgDescripcion') <p class="text-red-600 text-sm">{{ $message }}</p> @enderror
           </div>
         </div>
@@ -148,33 +145,20 @@
                     <div class="min-w-0">
                       <div class="text-sm font-semibold text-gray-900 truncate">
                         {{ $img['NOMBRE_IMAGEN'] ?? 'Sin título' }}
+                          
+                      @if(!empty($img['DESCRIPCION']))
+                        <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $img['DESCRIPCION'] }}</div>
+                      @endif
                       </div>
                     </div>
 
                     <button type="button"
-                            wire:click="eliminarImagen({{ $i }})"
-                            wire:loading.attr="disabled"
-                            wire:target="eliminarImagen({{ $i }})"
-                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700">
+                          wire:click="eliminarImagen({{ $i }})"
+                           class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700">
                       Eliminar
                     </button>
                   </div>
 
-                  <label class="block text-xs text-gray-600 mt-3 mb-1">Descripción</label>
-                  <textarea rows="2"
-                            wire:model.defer="imagenesExistentes.{{ $i }}.DESCRIPCION"
-                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white"
-                            placeholder="Escribí una descripción…"></textarea>
-
-                  <div class="mt-2 flex justify-end">
-                    <button type="button"
-                            wire:click="guardarDescripcionImagen({{ $i }})"
-                            wire:loading.attr="disabled"
-                            wire:target="guardarDescripcionImagen({{ $i }})"
-                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
-                      Guardar
-                    </button>
-                  </div>
                 </div>
               @endforeach
             </div>
@@ -471,9 +455,6 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <h2 class="font-semibold text-lg">Audios</h2>
-            <p class="text-sm text-gray-600">
-              Se guardan en Drive (carpeta Audios) y se registran en la hoja “Audios”.
-            </p>
           </div>
         </div>
 

@@ -494,16 +494,7 @@
 
     <div class="grid lg:grid-cols-2 gap-4 text-sm">
       <div class="p-4 rounded-lg bg-gray-50 border">
-        <div class="font-semibold">Motivo de Consulta</div>
-        <p class="whitespace-pre-line text-gray-700 mt-2">{{ $perfil['MOTIVO_CONSULTA'] ?? '—' }}</p>
-      </div>
-
-      <div class="p-4 rounded-lg bg-gray-50 border">
-        <div class="font-semibold">Resumen para Psicóloga</div>
-
-        <p class="whitespace-pre-line text-gray-700 mt-2">
-          {{ $perfil['RESUMEN_PARA_PSICOLOGA_TEXTO'] ?? '—' }}
-        </p>
+        <div class="font-semibold">Audio para el/la Psicólogo/a</div>
 
         {{-- Audios --}}
         @if(!empty($audios))
@@ -519,10 +510,11 @@
 
               @if($src)
                 <div class="bg-white border rounded-lg p-3">
+                
                   <div class="text-sm font-medium">{{ $titulo }}</div>
 
                   @if(trim($desc) !== '')
-                    <div class="text-xs text-gray-600 mt-1 whitespace-pre-line">{{ $desc }}</div>
+                    <div class="text-gray-500 text-sm mb-1">{{ $desc }}</div>
                   @endif
 
                   <audio class="w-full mt-2" controls preload="metadata">
